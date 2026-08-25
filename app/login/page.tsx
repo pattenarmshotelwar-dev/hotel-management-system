@@ -139,7 +139,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-slate-500 text-sm mt-6">
-          Hotel Management System v1.0
+          Created by UVDigital
         </p>
       </div>
     </div>
