@@ -62,8 +62,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Hotel className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="text-white font-semibold text-sm">Hotel PMS</p>
-            <p className="text-slate-400 text-xs">Management</p>
+            <p className="text-white font-semibold text-sm">Patten Arms Hotel</p>
+            <p className="text-slate-400 text-xs">Warrington</p>
           </div>
           <button
             className="ml-auto lg:hidden text-slate-400 hover:text-white"

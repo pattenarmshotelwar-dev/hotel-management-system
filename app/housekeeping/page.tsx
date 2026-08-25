@@ -100,7 +100,7 @@ export default function HousekeepingDashboard() {
       <div className="bg-slate-900 text-white px-4 py-4 sticky top-0 z-20">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="font-bold text-lg">🏨 Housekeeping</h1>
+            <h1 className="font-bold text-lg">🏨 Patten Arms Housekeeping</h1>
             <p className="text-slate-400 text-xs">{format(new Date(), 'EEEE, dd MMM yyyy')}</p>
           </div>
           <button onClick={() => setShowCleanerModal(true)} className="text-right">

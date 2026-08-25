@@ -6,8 +6,8 @@ import { Toaster } from 'sonner'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Hotel Management System',
-  description: 'Professional Hotel Property Management System',
+  title: 'Patten Arms Hotel Warrington',
+  description: 'Patten Arms Hotel Property Management System',
 }
 
 export default function RootLayout({
