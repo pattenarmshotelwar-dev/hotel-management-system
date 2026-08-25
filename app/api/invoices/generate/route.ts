@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const bookingId = searchParams.get('bookingId')
   if (!bookingId) return NextResponse.json({ error: 'bookingId required' }, { status: 400 })
 
-  const supabase = await createAdminClient()
+  const supabase: any = await createAdminClient()
 
   const { data: booking } = await supabase
     .from('bookings')
@@ -18,9 +18,9 @@ export async function GET(request: NextRequest) {
 
   if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 
-  const room = (booking as any).room
-  const payments: any[] = (booking as any).payments ?? []
-  const totalPaid = payments.filter((p: any) => p.status === 'succeeded').reduce((s: number, p: any) => s + p.amount, 0)
+  const room = booking.room
+  const payments: any[] = booking.payments ?? []
+  const totalPaid = payments.filter((p: any) => p.status === 'succeeded').reduce((s: number, p: any) => s + (p.amount ?? 0), 0)
   const nights = Math.ceil((new Date(booking.check_out_date).getTime() - new Date(booking.check_in_date).getTime()) / (1000 * 60 * 60 * 24))
 
   // Generate PDF
@@ -79,21 +79,21 @@ export async function GET(request: NextRequest) {
   // Line item
   doc.setFont('helvetica', 'normal')
   doc.text(`Room ${room?.room_number ?? ''} — ${nights} nights`, 20, 185)
-  doc.text(`£${booking.total_amount.toFixed(2)}`, pageWidth - 40, 185, { align: 'right' })
+  doc.text(`£${Number(booking.total_amount || 0).toFixed(2)}`, pageWidth - 40, 185, { align: 'right' })
 
   // Total
   doc.line(18, 193, pageWidth - 18, 193)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
   doc.text('TOTAL', 20, 202)
-  doc.text(`£${booking.total_amount.toFixed(2)}`, pageWidth - 40, 202, { align: 'right' })
+  doc.text(`£${Number(booking.total_amount || 0).toFixed(2)}`, pageWidth - 40, 202, { align: 'right' })
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(22, 163, 74) // green-600
-  doc.text(`Paid: £${totalPaid.toFixed(2)}`, 20, 210)
-  if (booking.total_amount - totalPaid > 0) {
+  doc.text(`Paid: £${Number(totalPaid).toFixed(2)}`, 20, 210)
+  if (Number(booking.total_amount || 0) - totalPaid > 0) {
     doc.setTextColor(220, 38, 38) // red-600
-    doc.text(`Balance Due: £${(booking.total_amount - totalPaid).toFixed(2)}`, 20, 217)
+    doc.text(`Balance Due: £${(Number(booking.total_amount || 0) - totalPaid).toFixed(2)}`, 20, 217)
   }
 
   // Payment details
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     for (const p of payments.filter((p: any) => p.status === 'succeeded')) {
-      doc.text(`${format(new Date(p.created_at), 'dd MMM yyyy')} — ${p.method.replace('_', ' ')} — £${p.amount.toFixed(2)}`, 20, y)
+      doc.text(`${format(new Date(p.created_at), 'dd MMM yyyy')} — ${p.method.replace('_', ' ')} — £${Number(p.amount).toFixed(2)}`, 20, y)
       y += 7
     }
   }

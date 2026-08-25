@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import ical from 'ical-generator'
-import { format } from 'date-fns'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { roomId: string } }
+  context: { params: Promise<{ roomId: string }> }
 ) {
-  const { roomId } = params
-  const supabase = await createAdminClient()
+  const { roomId } = await context.params
+  const supabase: any = await createAdminClient()
 
   // Fetch room
   const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single()

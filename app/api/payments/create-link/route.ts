@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createAdminClient } from '@/lib/supabase/server'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' })
-
 export async function POST(request: NextRequest) {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder')
   const { bookingId, amount, guestName, guestEmail, description } = await request.json()
 
-  const supabase = await createAdminClient()
+  const supabase: any = await createAdminClient()
 
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],

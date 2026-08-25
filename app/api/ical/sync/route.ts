@@ -4,7 +4,7 @@ import nodeIcal from 'node-ical'
 import { format } from 'date-fns'
 
 export async function POST(request: NextRequest) {
-  const supabase = await createAdminClient()
+  const supabase: any = await createAdminClient()
 
   // Get all rooms with iCal import URLs
   const { data: rooms } = await supabase
@@ -29,16 +29,17 @@ export async function POST(request: NextRequest) {
       const events = await nodeIcal.async.fromURL(room.ical_import_url)
 
       for (const [uid, event] of Object.entries(events)) {
-        if (event.type !== 'VEVENT') continue
+        if (!event || (event as any).type !== 'VEVENT') continue
 
-        const startDate = event.start instanceof Date ? event.start : new Date(event.start as any)
-        const endDate = event.end instanceof Date ? event.end : new Date(event.end as any)
+        const vEvent: any = event
+        const startDate = vEvent.start instanceof Date ? vEvent.start : new Date(vEvent.start)
+        const endDate = vEvent.end instanceof Date ? vEvent.end : new Date(vEvent.end)
 
         const checkIn = format(startDate, 'yyyy-MM-dd')
         const checkOut = format(endDate, 'yyyy-MM-dd')
 
         // Extract guest name from summary
-        const summary = (event.summary as any)?.val ?? event.summary ?? 'Booking.com Guest'
+        const summary = vEvent.summary?.val ?? vEvent.summary ?? 'Booking.com Guest'
         const nameParts = String(summary).split(' ')
         const guestFirstName = nameParts[0] ?? 'Booking.com'
         const guestLastName = nameParts.slice(1).join(' ') || 'Guest'

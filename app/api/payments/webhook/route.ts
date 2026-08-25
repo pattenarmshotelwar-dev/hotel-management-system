@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createAdminClient } from '@/lib/supabase/server'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' })
-
 export async function POST(request: NextRequest) {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder')
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')!
 
@@ -15,7 +14,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Webhook error: ${err.message}` }, { status: 400 })
   }
 
-  const supabase = await createAdminClient()
+  const supabase: any = await createAdminClient()
 
   switch (event.type) {
     case 'checkout.session.completed': {
