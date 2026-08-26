@@ -103,10 +103,24 @@ export default function HousekeepingDashboard() {
             <h1 className="font-bold text-lg">🏨 Patten Arms Housekeeping</h1>
             <p className="text-slate-400 text-xs">{format(new Date(), 'EEEE, dd MMM yyyy')}</p>
           </div>
-          <button onClick={() => setShowCleanerModal(true)} className="text-right">
-            <p className="text-sm font-medium text-white">{cleanerName || 'Set Name'}</p>
-            <p className="text-xs text-slate-400">Tap to change</p>
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowCleanerModal(true)} className="text-right">
+              <p className="text-sm font-medium text-white">{cleanerName || 'Set Name'}</p>
+              <p className="text-xs text-slate-400">Tap to change</p>
+            </button>
+            <button
+              onClick={async () => {
+                sessionStorage.removeItem('patten_hotel_session_active')
+                sessionStorage.removeItem('patten_hotel_last_activity')
+                await supabase.auth.signOut()
+                window.location.href = '/login'
+              }}
+              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

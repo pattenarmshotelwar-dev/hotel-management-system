@@ -35,6 +35,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const handleLogout = async () => {
+    sessionStorage.removeItem('patten_hotel_session_active')
+    sessionStorage.removeItem('patten_hotel_last_activity')
     await supabase.auth.signOut()
     toast.success('Logged out successfully')
     router.push('/login')

@@ -31,6 +31,10 @@ export default function LoginPage() {
     }
 
     if (data.user) {
+      // Set active session marker for tab-close & inactivity tracking
+      sessionStorage.setItem('patten_hotel_session_active', 'true')
+      sessionStorage.setItem('patten_hotel_last_activity', Date.now().toString())
+
       // Determine role by email
       if (data.user.email === HOUSEKEEPING_EMAIL) {
         router.push('/housekeeping')
