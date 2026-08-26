@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Hotel, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -51,10 +52,16 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo & Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-lg">
-            <Hotel className="w-8 h-8 text-white" />
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/logo.jpg"
+              alt="The Patten Arms Hotel"
+              width={200}
+              height={100}
+              className="object-contain drop-shadow-lg"
+              priority
+            />
           </div>
-          <h1 className="text-2xl font-bold text-white text-center">Patten Arms Hotel Warrington</h1>
           <p className="text-slate-400 mt-1">Sign in to your dashboard</p>
         </div>
 

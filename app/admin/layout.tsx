@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
-  Hotel,
   LayoutDashboard,
   Calendar,
   BookOpen,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import Image from 'next/image'
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -59,14 +59,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-700">
-          <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Hotel className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <p className="text-white font-semibold text-sm">Patten Arms Hotel</p>
-            <p className="text-slate-400 text-xs">Warrington</p>
-          </div>
+        <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-700">
+          <Image
+            src="/logo.jpg"
+            alt="The Patten Arms Hotel"
+            width={140}
+            height={60}
+            className="object-contain"
+            priority
+          />
           <button
             className="ml-auto lg:hidden text-slate-400 hover:text-white"
             onClick={() => setSidebarOpen(false)}
