@@ -56,10 +56,11 @@ export default function LoginPage() {
             <Image
               src="/logo.jpg"
               alt="The Patten Arms Hotel"
-              width={200}
+              width={220}
               height={100}
-              className="object-contain drop-shadow-lg"
+              className="h-20 w-auto object-contain drop-shadow-lg"
               priority
+              unoptimized
             />
           </div>
           <p className="text-slate-400 mt-1">Sign in to your dashboard</p>

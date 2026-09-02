@@ -65,8 +65,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             alt="The Patten Arms Hotel"
             width={140}
             height={60}
-            className="object-contain"
+            className="h-10 w-auto object-contain"
             priority
+            unoptimized
           />
           <button
             className="ml-auto lg:hidden text-slate-400 hover:text-white"

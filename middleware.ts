@@ -27,8 +27,12 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Allow public routes
-  if (pathname.startsWith('/login') || pathname.startsWith('/api/ical/export')) {
+  // Allow public routes and static assets
+  if (
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/api/ical/export') ||
+    pathname.match(/\.(jpg|jpeg|png|gif|svg|webp|ico|pdf|txt)$/i)
+  ) {
     if (user && pathname === '/login') {
       return NextResponse.redirect(new URL('/admin', request.url))
     }
@@ -45,6 +49,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/payments/webhook).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|pdf|txt)$|api/payments/webhook).*)',
   ],
 }
