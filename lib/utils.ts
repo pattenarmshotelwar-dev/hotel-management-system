@@ -212,3 +212,32 @@ export function sendCleanerWhatsAppMessage({
     window.open(url, '_blank')
   }
 }
+
+export const DEFAULT_ADDON_PRESETS: Array<{
+  id: string
+  name: string
+  price: number
+  category: 'breakfast' | 'checkin_checkout' | 'parking' | 'pet' | 'fee' | 'damage' | 'other'
+  description: string
+}> = [
+  { id: 'addon_breakfast', name: 'Full English Breakfast', price: 10.0, category: 'breakfast', description: 'Fresh cooked English breakfast per guest per morning' },
+  { id: 'addon_late_co', name: 'Late Check-out (until 1:00 PM)', price: 15.0, category: 'checkin_checkout', description: 'Extended departure time until 13:00' },
+  { id: 'addon_early_ci', name: 'Early Check-in (from 12:00 PM)', price: 15.0, category: 'checkin_checkout', description: 'Early room access from 12:00 PM noon' },
+  { id: 'addon_parking', name: 'Overnight Parking Pass', price: 5.0, category: 'parking', description: 'Hotel customer car park space per night' },
+  { id: 'addon_pet', name: 'Pet Stay Surcharge', price: 20.0, category: 'pet', description: 'Pet cleaning fee per stay' },
+  { id: 'addon_lost_key', name: 'Lost Key / Fob Replacement Fee', price: 25.0, category: 'fee', description: 'Physical brass key or electronic fob replacement fee' },
+  { id: 'addon_extra_bed', name: 'Extra Bed / Rollaway', price: 25.0, category: 'other', description: 'Additional single rollaway bed per night' },
+  { id: 'addon_damage', name: 'Damage / Smoking / Deep Clean Charge', price: 50.0, category: 'damage', description: 'Incident fee for room damage or unauthorized smoking' },
+]
+
+export function getSavedAddonPresets(): typeof DEFAULT_ADDON_PRESETS {
+  if (typeof window === 'undefined') return DEFAULT_ADDON_PRESETS
+  const saved = localStorage.getItem('patten_addon_presets')
+  if (!saved) return DEFAULT_ADDON_PRESETS
+  try {
+    const parsed = JSON.parse(saved)
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_ADDON_PRESETS
+  } catch (e) {
+    return DEFAULT_ADDON_PRESETS
+  }
+}

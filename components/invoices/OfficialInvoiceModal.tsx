@@ -57,6 +57,45 @@ export default function OfficialInvoiceModal({ booking, payments = [], onClose }
   const roomNumber = (booking as any).room?.room_number ?? 'Assigned'
   const roomTypeLabel = ((booking as any).room?.room_type ?? 'Standard').replace('_', ' ')
 
+  // Parse add-ons from internal_notes if present: e.g. [ADDON]: 1x Breakfast (£10.00) or [ADDONS]: 2x Breakfast (£20.00), 1x Late Check-out (£15.00)
+  const parsedAddons: Array<{ description: string; qty: string; unitPrice: number; total: number }> = []
+  if (booking.internal_notes) {
+    const lines = String(booking.internal_notes).split('\n')
+    lines.forEach(line => {
+      if (line.includes('[ADDON')) {
+        const content = line.replace(/\[ADDON[S]?\]:\s*/g, '')
+        const items = content.split(',').map(s => s.trim()).filter(Boolean)
+        items.forEach(item => {
+          // match: 2x Full English Breakfast (£20.00) or 1x Pet Stay (£20.00) - note
+          const match = item.match(/^(\d+)x\s+([^()]+?)(?:\s*\((?:£|GBP)?([0-9.]+)\))?(?:\s*-\s*(.+))?$/)
+          if (match) {
+            const qtyNum = parseInt(match[1]) || 1
+            const name = match[2].trim()
+            const totalVal = parseFloat(match[3]) || 0
+            const unitVal = qtyNum > 0 ? totalVal / qtyNum : totalVal
+            parsedAddons.push({
+              description: name,
+              qty: `${qtyNum}`,
+              unitPrice: unitVal,
+              total: totalVal,
+            })
+          } else {
+            // Fallback for simple line
+            parsedAddons.push({
+              description: item,
+              qty: '1',
+              unitPrice: 0,
+              total: 0,
+            })
+          }
+        })
+      }
+    })
+  }
+
+  const addonsTotalSum = parsedAddons.reduce((sum, a) => sum + a.total, 0)
+  const accommodationGross = Math.max(0, grossTotal - addonsTotalSum)
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto print:p-0 print:bg-white print:fixed">
       <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden print:shadow-none print:w-full print:max-w-none">
@@ -196,12 +235,30 @@ export default function OfficialInvoiceModal({ booking, payments = [], onClose }
                   </td>
                   <td className="px-4 py-3 text-center text-slate-600">{nights} night{nights > 1 ? 's' : ''}</td>
                   <td className="px-4 py-3 text-right text-slate-600">
-                    {formatCurrency(nights > 0 ? grossTotal / nights : grossTotal)}
+                    {formatCurrency(nights > 0 ? accommodationGross / nights : accommodationGross)}
                   </td>
                   <td className="px-4 py-3 text-right font-bold text-slate-900">
-                    {formatCurrency(grossTotal)}
+                    {formatCurrency(accommodationGross)}
                   </td>
                 </tr>
+
+                {/* Additional Add-on & Incidental Rows */}
+                {parsedAddons.map((addon, index) => (
+                  <tr key={index} className="bg-slate-50/40">
+                    <td className="px-4 py-2.5 text-slate-500">{formatDate(booking.check_in_date, 'dd/MM/yyyy')}</td>
+                    <td className="px-4 py-2.5 font-medium text-slate-800 flex items-center gap-1.5">
+                      <span className="text-blue-600 font-bold">•</span>
+                      <span>{addon.description}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center text-slate-600">{addon.qty}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-600">
+                      {formatCurrency(addon.unitPrice)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-slate-900">
+                      {formatCurrency(addon.total)}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

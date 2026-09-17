@@ -134,6 +134,15 @@ export interface MaintenanceTicket {
   room?: Room
 }
 
+export interface AddonItem {
+  id: string
+  name: string
+  price: number
+  category?: 'breakfast' | 'checkin_checkout' | 'parking' | 'pet' | 'fee' | 'damage' | 'other'
+  description?: string
+  quantity?: number
+}
+
 export interface IcalSyncLog {
   id: string
   room_id: string | null

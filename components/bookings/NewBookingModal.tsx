@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Room } from '@/lib/types'
-import { formatCurrency, nightCount } from '@/lib/utils'
-import { X, Loader2, Calendar } from 'lucide-react'
+import { formatCurrency, nightCount, getSavedAddonPresets, cn } from '@/lib/utils'
+import { X, Loader2, Calendar, Plus, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 
@@ -19,6 +19,9 @@ const COUNTRIES = ['United Kingdom', 'United States', 'Ireland', 'Germany', 'Fra
 export default function NewBookingModal({ rooms, onClose, onCreated }: Props) {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
+  const [addonPresets, setAddonPresets] = useState<any[]>([])
+  const [selectedAddons, setSelectedAddons] = useState<Record<string, { name: string; price: number; quantity: number }>>({})
+
   const [form, setForm] = useState({
     room_id: '',
     guest_first_name: '',
@@ -39,24 +42,55 @@ export default function NewBookingModal({ rooms, onClose, onCreated }: Props) {
     maintenance_reason: '',
   })
 
+  // Load add-on presets on mount
+  useState(() => {
+    setAddonPresets(getSavedAddonPresets())
+  })
+
   const selectedRoom = rooms.find(r => r.id === form.room_id)
   const nights = form.check_in_date && form.check_out_date ? nightCount(form.check_in_date, form.check_out_date) : 0
 
-  const handleRoomSelect = (roomId: string) => {
+  const calculateTotal = (roomId: string, inDate: string, outDate: string, addons = selectedAddons) => {
     const room = rooms.find(r => r.id === roomId)
+    const n = inDate && outDate ? nightCount(inDate, outDate) : 0
+    const roomSubtotal = room && n > 0 ? room.base_price * n : 0
+    const addonsTotal = Object.values(addons).reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    return String(roomSubtotal + addonsTotal)
+  }
+
+  const handleRoomSelect = (roomId: string) => {
     setForm(f => ({
       ...f,
       room_id: roomId,
-      total_amount: room && nights > 0 ? String(room.base_price * nights) : f.total_amount
+      total_amount: calculateTotal(roomId, f.check_in_date, f.check_out_date, selectedAddons)
     }))
   }
 
   const handleDateChange = (field: 'check_in_date' | 'check_out_date', value: string) => {
     setForm(f => {
-      const updated = { ...f, [field]: value }
-      const n = updated.check_in_date && updated.check_out_date ? nightCount(updated.check_in_date, updated.check_out_date) : 0
-      const room = rooms.find(r => r.id === f.room_id)
-      return { ...updated, total_amount: room && n > 0 ? String(room.base_price * n) : f.total_amount }
+      const inDate = field === 'check_in_date' ? value : f.check_in_date
+      const outDate = field === 'check_out_date' ? value : f.check_out_date
+      return {
+        ...f,
+        [field]: value,
+        total_amount: calculateTotal(f.room_id, inDate, outDate, selectedAddons)
+      }
+    })
+  }
+
+  const toggleAddon = (preset: any) => {
+    setSelectedAddons(prev => {
+      const next = { ...prev }
+      if (next[preset.id]) {
+        delete next[preset.id]
+      } else {
+        next[preset.id] = { name: preset.name, price: Number(preset.price), quantity: 1 }
+      }
+      setForm(f => ({
+        ...f,
+        total_amount: calculateTotal(f.room_id, f.check_in_date, f.check_out_date, next)
+      }))
+      return next
     })
   }
 
@@ -66,6 +100,14 @@ export default function NewBookingModal({ rooms, onClose, onCreated }: Props) {
     if (nights <= 0) { toast.error('Check-out must be after check-in'); return }
 
     setLoading(true)
+
+    // Build add-on summary string to store in internal_notes or special_requests
+    const addonList = Object.values(selectedAddons)
+    const addonSummary = addonList.length > 0 
+      ? `[ADDONS]: ` + addonList.map(a => `${a.quantity}x ${a.name} (£${(a.price * a.quantity).toFixed(2)})`).join(', ')
+      : ''
+    const combinedNotes = [form.internal_notes, addonSummary].filter(Boolean).join('\n')
+
     const { error } = await supabase.from('bookings').insert({
       room_id: form.room_id,
       guest_first_name: form.guest_first_name,
@@ -83,7 +125,7 @@ export default function NewBookingModal({ rooms, onClose, onCreated }: Props) {
       source: form.source as any,
       status: 'confirmed',
       special_requests: form.special_requests || null,
-      internal_notes: form.internal_notes || null,
+      internal_notes: combinedNotes || null,
       is_maintenance_block: form.is_maintenance_block,
       maintenance_reason: form.is_maintenance_block ? form.maintenance_reason : null,
     })
@@ -235,6 +277,59 @@ export default function NewBookingModal({ rooms, onClose, onCreated }: Props) {
                   <label className="block text-sm text-slate-600 mb-1">Total Amount (£) *</label>
                   <input required type="number" step="0.01" min="0" value={form.total_amount} onChange={e => setForm(f => ({ ...f, total_amount: e.target.value }))}
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00" />
+                </div>
+              </div>
+
+              {/* Add-ons & Extras Selector */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    🛎️ Add-ons & Incidentals (Optional)
+                  </label>
+                  <span className="text-[11px] text-slate-500">
+                    {Object.keys(selectedAddons).length} selected (+£
+                    {Object.values(selectedAddons)
+                      .reduce((s, a) => s + a.price * a.quantity, 0)
+                      .toFixed(2)}
+                    )
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {addonPresets.map(preset => {
+                    const isSelected = !!selectedAddons[preset.id]
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => toggleAddon(preset)}
+                        className={cn(
+                          'flex items-center justify-between p-2.5 rounded-xl border text-left transition cursor-pointer',
+                          isSelected
+                            ? 'bg-blue-50 border-blue-400 text-blue-900 shadow-sm'
+                            : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                        )}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <p className="text-xs font-semibold truncate">{preset.name}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{preset.description}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs font-bold font-mono">
+                            +£{Number(preset.price).toFixed(2)}
+                          </span>
+                          <div
+                            className={cn(
+                              'w-4 h-4 rounded-md flex items-center justify-center text-[10px] font-bold',
+                              isSelected ? 'bg-blue-600 text-white' : 'border border-slate-300'
+                            )}
+                          >
+                            {isSelected && '✓'}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Room } from '@/lib/types'
-import { formatCurrency, formatDate, formatDateTime, getRoomTypeLabel, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, formatDateTime, getRoomTypeLabel, cn, DEFAULT_ADDON_PRESETS, getSavedAddonPresets } from '@/lib/utils'
 import {
   Save,
   Plus,
@@ -35,7 +35,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [syncingAll, setSyncingAll] = useState(false)
-  const [activeTab, setActiveTab] = useState<'rooms' | 'ical' | 'hotel'>('rooms')
+  const [activeTab, setActiveTab] = useState<'rooms' | 'ical' | 'hotel' | 'addons'>('rooms')
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [floorFilter, setFloorFilter] = useState('all')
@@ -63,6 +63,7 @@ export default function SettingsPage() {
     cancellationPolicy: 'Free cancellation up to 24 hours prior to check-in. Non-refundable afterwards.',
   })
   const [savingHotelConfig, setSavingHotelConfig] = useState(false)
+  const [addonPresets, setAddonPresets] = useState<any[]>(DEFAULT_ADDON_PRESETS)
 
   useEffect(() => {
     fetchRooms()
@@ -73,7 +74,47 @@ export default function SettingsPage() {
         setHotelConfig(JSON.parse(savedConfig))
       } catch (e) {}
     }
+    setAddonPresets(getSavedAddonPresets())
   }, [])
+
+  const handleUpdatePreset = (index: number, field: string, value: any) => {
+    setAddonPresets(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], [field]: value }
+      return updated
+    })
+  }
+
+  const handleDeletePreset = (index: number) => {
+    setAddonPresets(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleAddCustomPreset = () => {
+    const newId = `addon_${Date.now()}`
+    setAddonPresets(prev => [
+      ...prev,
+      {
+        id: newId,
+        name: 'New Custom Add-on',
+        price: 10.0,
+        category: 'other',
+        description: 'Custom fee or hotel incidental',
+      },
+    ])
+  }
+
+  const handleSavePresets = () => {
+    localStorage.setItem('patten_addon_presets', JSON.stringify(addonPresets))
+    toast.success('Add-on and incidental presets saved!')
+  }
+
+  const handleResetDefaultPresets = () => {
+    if (confirm('Reset all presets back to default Patten Arms Hotel presets?')) {
+      setAddonPresets(DEFAULT_ADDON_PRESETS)
+      localStorage.setItem('patten_addon_presets', JSON.stringify(DEFAULT_ADDON_PRESETS))
+      toast.success('Restored default presets')
+    }
+  }
 
   const fetchRooms = async () => {
     setLoading(true)
@@ -222,6 +263,7 @@ export default function SettingsPage() {
           { id: 'rooms', label: `Room Inventory (${rooms.length})` },
           { id: 'ical', label: `Booking.com iCal (${configuredIcalCount}/${rooms.length} linked)` },
           { id: 'hotel', label: 'Hotel Profile & Policies' },
+          { id: 'addons', label: `Add-ons & Fees (${addonPresets.length})` },
         ].map(tab => (
           <button
             key={tab.id}
@@ -697,6 +739,101 @@ export default function SettingsPage() {
                 {savingHotelConfig ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 Save Changes
               </button>
+            </div>
+          )}
+
+          {/* TAB 4: ADD-ONS & INCIDENTAL FEE PRESETS */}
+          {activeTab === 'addons' && (
+            <div className="space-y-4">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4 mb-4">
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                      🛎️ Add-ons, Incidentals & Fee Presets
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Configure standard extras and fee defaults available when creating reservations, checking in guests, or raising room incidentals.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleAddCustomPreset}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-sm transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> New Preset
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {addonPresets.map((preset, idx) => (
+                    <div
+                      key={preset.id}
+                      className="border border-slate-200 hover:border-slate-300 rounded-xl p-4 bg-slate-50/60 transition space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            value={preset.name}
+                            onChange={e => handleUpdatePreset(idx, 'name', e.target.value)}
+                            className="w-full font-bold text-slate-800 text-xs bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none px-1 py-0.5 rounded transition"
+                          />
+                          <input
+                            type="text"
+                            value={preset.description}
+                            onChange={e => handleUpdatePreset(idx, 'description', e.target.value)}
+                            className="w-full text-[11px] text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none px-1 py-0.5 rounded transition mt-1"
+                            placeholder="Optional description..."
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleDeletePreset(idx)}
+                          className="text-slate-400 hover:text-red-600 p-1 rounded-lg transition"
+                          title="Delete Preset"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/70 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-500 text-[11px] font-medium">Default Fee:</span>
+                          <div className="relative flex items-center">
+                            <span className="absolute left-2 text-slate-400 text-xs font-bold">£</span>
+                            <input
+                              type="number"
+                              step="0.50"
+                              min="0"
+                              value={preset.price}
+                              onChange={e => handleUpdatePreset(idx, 'price', parseFloat(e.target.value) || 0)}
+                              className="w-24 pl-5 pr-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200/80 text-slate-700 rounded-md uppercase tracking-wider">
+                          {preset.category || 'addon'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
+                  <button
+                    onClick={handleResetDefaultPresets}
+                    className="text-xs text-slate-400 hover:text-slate-600 transition underline cursor-pointer"
+                  >
+                    Restore Standard Hotel Defaults
+                  </button>
+                  <button
+                    onClick={handleSavePresets}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    Save Add-on Presets
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </>
