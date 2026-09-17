@@ -42,7 +42,7 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState<(Payment & { booking?: Booking })[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
-  const [invoiceBooking, setInvoiceBooking] = useState<Booking | null>(null)
+  const [invoiceBooking, setInvoiceBooking] = useState<any | null>(null)
 
   // Filters
   const [search, setSearch] = useState('')

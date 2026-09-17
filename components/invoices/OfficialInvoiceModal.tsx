@@ -7,8 +7,8 @@ import { X, Printer } from 'lucide-react'
 import Image from 'next/image'
 
 interface Props {
-  booking: Booking
-  payments?: Payment[]
+  booking: any
+  payments?: any[]
   onClose: () => void
 }
 
