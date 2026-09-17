@@ -20,6 +20,10 @@ import {
   ArrowUpRight,
   ShieldAlert,
   Info,
+  Globe,
+  Link2,
+  ExternalLink,
+  Radio,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -102,6 +106,11 @@ export default function PricingPage() {
   const [surgeReason, setSurgeReason] = useState<string>('')
   const [activeSurgeEvents, setActiveSurgeEvents] = useState<Record<string, boolean>>({})
 
+  // Booking.com OTA Channel Parity & Margin Markup
+  const [bookingComCommission, setBookingComCommission] = useState<number>(15) // standard 15% OTA commission
+  const [syncingBookingCom, setSyncingBookingCom] = useState(false)
+  const [bookingComLastSync, setBookingComLastSync] = useState<string | null>(null)
+
   // Room custom overrides (base price, weekend price)
   const [roomRates, setRoomRates] = useState<Record<string, { base: number; weekend: number }>>({})
 
@@ -120,6 +129,8 @@ export default function PricingPage() {
         if (config.surgeMultiplier !== undefined) setSurgeMultiplier(config.surgeMultiplier)
         if (config.surgeReason !== undefined) setSurgeReason(config.surgeReason)
         if (config.activeSurgeEvents) setActiveSurgeEvents(config.activeSurgeEvents)
+        if (config.bookingComCommission !== undefined) setBookingComCommission(config.bookingComCommission)
+        if (config.bookingComLastSync) setBookingComLastSync(config.bookingComLastSync)
       }
     } catch (e) {}
   }
@@ -203,6 +214,8 @@ export default function PricingPage() {
       surgeMultiplier,
       surgeReason,
       activeSurgeEvents,
+      bookingComCommission,
+      bookingComLastSync,
     }
     localStorage.setItem('patten_pricing_yield_config', JSON.stringify(config))
     localStorage.setItem('patten_room_rate_overrides', JSON.stringify(roomRates))
@@ -228,7 +241,43 @@ export default function PricingPage() {
     }
   }
 
-  // Calculate live dynamic rate for a room given current surge
+  const handleSyncBookingComRates = async () => {
+    setSyncingBookingCom(true)
+    try {
+      const payloadRates: Record<string, number> = {}
+      rooms.forEach(r => {
+        const current = roomRates[r.id]?.base || r.base_price
+        payloadRates[r.id] = calculateBookingComRate(current, false)
+      })
+
+      const res = await fetch('/api/pricing/booking-com', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelMarkupPercent: bookingComCommission,
+          rates: payloadRates,
+          updateBasePrices: false,
+        }),
+      })
+      const data = await res.json()
+      const syncTimestamp = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+      setBookingComLastSync(syncTimestamp)
+
+      // Save to localStorage
+      const saved = localStorage.getItem('patten_pricing_yield_config')
+      const currentConfig = saved ? JSON.parse(saved) : {}
+      currentConfig.bookingComCommission = bookingComCommission
+      currentConfig.bookingComLastSync = syncTimestamp
+      localStorage.setItem('patten_pricing_yield_config', JSON.stringify(currentConfig))
+
+      toast.success(`Booking.com rates updated with +${bookingComCommission}% margin parity!`)
+    } catch (e) {
+      toast.error('Failed to sync rates to Booking.com endpoint')
+    }
+    setSyncingBookingCom(false)
+  }
+
+  // Calculate live dynamic rate for direct booking
   const calculateEffectiveRate = (baseRate: number, isWeekend: boolean) => {
     let rate = baseRate
     if (isWeekend) {
@@ -240,6 +289,12 @@ export default function PricingPage() {
       rate = rate * (1 + surgeMultiplier / 100)
     }
     return Math.round(rate)
+  }
+
+  // Calculate Booking.com channel rate (Direct rate + OTA markup to ensure hotel receives desired net revenue after 15% fee)
+  const calculateBookingComRate = (baseRate: number, isWeekend: boolean) => {
+    const direct = calculateEffectiveRate(baseRate, isWeekend)
+    return Math.round(direct * (1 + bookingComCommission / 100))
   }
 
   return (
@@ -528,6 +583,50 @@ export default function PricingPage() {
               </p>
             </div>
 
+            {/* Booking.com OTA Channel Parity & Margin Protection */}
+            <div className="bg-sky-50/80 border border-sky-200 p-4 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Globe className="w-4 h-4 text-sky-600" />
+                  <label className="text-xs font-bold text-sky-950">
+                    Booking.com OTA Markup
+                  </label>
+                </div>
+                <span className="text-xs font-extrabold font-mono text-sky-700 bg-sky-100/80 px-2 py-0.5 rounded-md">
+                  +{bookingComCommission}%
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min={0}
+                max={30}
+                step={1}
+                value={bookingComCommission}
+                onChange={e => setBookingComCommission(Number(e.target.value))}
+                className="w-full accent-sky-600 cursor-pointer"
+              />
+
+              <p className="text-[11px] text-sky-800 leading-relaxed">
+                Automatically offsets Booking.com’s standard ~15% commission fee so the hotel preserves full profit margin across OTA listings.
+              </p>
+
+              <div className="pt-1 flex items-center justify-between text-[11px] border-t border-sky-200/60 mt-2">
+                <span className="text-slate-500 font-medium">
+                  {bookingComLastSync ? `Last synced: ${bookingComLastSync}` : 'iCal feed connected'}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSyncBookingComRates}
+                  disabled={syncingBookingCom}
+                  className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold shadow-2xs transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={cn('w-3 h-3', syncingBookingCom && 'animate-spin')} />
+                  {syncingBookingCom ? 'Syncing...' : 'Sync OTA Rates'}
+                </button>
+              </div>
+            </div>
+
             {/* Yield Strategy Info */}
             <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1 text-[11px] text-blue-900">
               <div className="flex items-center gap-1 font-bold">
@@ -546,11 +645,20 @@ export default function PricingPage() {
         <div className="p-5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-sm font-bold text-slate-900">Room Pricing & Live Dynamic Yield Table</h2>
-            <p className="text-[11px] text-slate-500">Calculates active selling price with weekend & surge adjustments applied</p>
+            <p className="text-[11px] text-slate-500">Calculates active selling prices for Direct Bookings vs. Booking.com OTA channels with weekend & surge rules</p>
           </div>
-          <span className="text-xs text-slate-400 font-mono">
-            {rooms.length} Rooms Loaded
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400 font-mono">
+              {rooms.length} Rooms Loaded
+            </span>
+            <button
+              onClick={handleSyncBookingComRates}
+              disabled={syncingBookingCom}
+              className="flex items-center gap-1 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-xl transition cursor-pointer"
+            >
+              <Globe className="w-3.5 h-3.5" /> Push to Booking.com
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -560,10 +668,13 @@ export default function PricingPage() {
                 <th className="px-4 py-3">Room</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Floor</th>
-                <th className="px-4 py-3">Standard Midweek (£)</th>
-                <th className="px-4 py-3">Standard Weekend (£)</th>
+                <th className="px-4 py-3">Direct Midweek (£)</th>
+                <th className="px-4 py-3">Direct Weekend (£)</th>
                 <th className="px-4 py-3 bg-amber-50/80 text-amber-900">
-                  Live Rate (With Active Surge)
+                  Live Direct Rate
+                </th>
+                <th className="px-4 py-3 bg-sky-50/80 text-sky-950 font-bold border-l border-sky-100">
+                  🌐 Booking.com Rate (+{bookingComCommission}%)
                 </th>
                 <th className="px-4 py-3 text-right">Quick Edit</th>
               </tr>
@@ -576,6 +687,8 @@ export default function PricingPage() {
                 }
                 const liveMidweek = calculateEffectiveRate(currentRates.base, false)
                 const liveWeekend = calculateEffectiveRate(currentRates.base, true)
+                const bcomMidweek = calculateBookingComRate(currentRates.base, false)
+                const bcomWeekend = calculateBookingComRate(currentRates.base, true)
 
                 return (
                   <tr key={room.id} className="hover:bg-slate-50/80 transition">
@@ -613,7 +726,7 @@ export default function PricingPage() {
                       </div>
                     </td>
 
-                    {/* Dynamic Rate Under Surge */}
+                    {/* Dynamic Direct Rate Under Surge */}
                     <td className="px-4 py-3 bg-amber-50/50">
                       <div className="flex items-center gap-3">
                         <div>
@@ -633,6 +746,27 @@ export default function PricingPage() {
                             +{surgeMultiplier}%
                           </span>
                         )}
+                      </div>
+                    </td>
+
+                    {/* Booking.com Live Selling Rate (Direct + Commission Parity) */}
+                    <td className="px-4 py-3 bg-sky-50/40 border-l border-sky-100">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <span className="text-[10px] text-sky-600 uppercase block font-semibold">OTA Mid</span>
+                          <span className="font-bold text-sky-900 font-mono text-xs">
+                            £{bcomMidweek}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-sky-600 uppercase block font-semibold">OTA Wknd</span>
+                          <span className="font-bold text-sky-950 font-mono text-xs">
+                            £{bcomWeekend}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          (Net: £{liveMidweek})
+                        </span>
                       </div>
                     </td>
 

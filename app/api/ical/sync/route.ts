@@ -44,32 +44,42 @@ export async function POST(request: NextRequest) {
         const guestFirstName = nameParts[0] ?? 'Booking.com'
         const guestLastName = nameParts.slice(1).join(' ') || 'Guest'
 
+        const nights = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
+        const roomBasePrice = Number(room.base_price) || 50
+        // Calculate estimated revenue for Booking.com stay with default 15% commission markup
+        const estimatedStayTotal = Math.round(roomBasePrice * nights * 1.15)
+
         // Check if booking already exists
         const { data: existing } = await supabase
           .from('bookings')
-          .select('id')
+          .select('id, total_amount')
           .eq('room_id', room.id)
           .eq('ical_uid', uid)
           .single()
 
         if (existing) {
-          // Update existing
-          await supabase.from('bookings').update({
+          // Update existing, ensuring non-zero total if currently 0
+          const updates: any = {
             check_in_date: checkIn,
             check_out_date: checkOut,
             guest_first_name: guestFirstName,
             guest_last_name: guestLastName,
-          }).eq('id', existing.id)
+          }
+          if (!existing.total_amount || Number(existing.total_amount) === 0) {
+            updates.total_amount = estimatedStayTotal
+          }
+
+          await supabase.from('bookings').update(updates).eq('id', existing.id)
           totalUpdated++
         } else {
-          // Insert new booking
+          // Insert new booking with calculated total amount
           await supabase.from('bookings').insert({
             room_id: room.id,
             guest_first_name: guestFirstName,
             guest_last_name: guestLastName,
             check_in_date: checkIn,
             check_out_date: checkOut,
-            total_amount: 0,
+            total_amount: estimatedStayTotal,
             currency: 'GBP',
             source: 'booking_com',
             status: 'confirmed',
