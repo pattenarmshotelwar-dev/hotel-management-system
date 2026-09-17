@@ -100,7 +100,7 @@ export default function OfficialInvoiceModal({ booking, payments = [], onClose }
               <div className="mt-3 space-y-1 text-xs">
                 <p>
                   <span className="text-slate-500">Invoice No:</span>{' '}
-                  <span className="font-mono font-bold text-sm">PAH-{booking.booking_reference}</span>
+                  <span className="font-mono font-bold text-sm">PAH-{booking?.booking_reference || 'N/A'}</span>
                 </p>
                 <p>
                   <span className="text-slate-500">Invoice Date:</span>{' '}
@@ -108,7 +108,7 @@ export default function OfficialInvoiceModal({ booking, payments = [], onClose }
                 </p>
                 <p>
                   <span className="text-slate-500">Folio No:</span>{' '}
-                  <span className="font-mono font-semibold">{booking.booking_reference.replace(/[^0-9]/g, '') || '000104'}</span>
+                  <span className="font-mono font-semibold">{(booking?.booking_reference || '').replace(/[^0-9]/g, '') || '000104'}</span>
                 </p>
               </div>
             </div>
@@ -167,7 +167,7 @@ export default function OfficialInvoiceModal({ booking, payments = [], onClose }
                 </p>
                 <p>
                   <span className="text-slate-500">No. of Guests:</span>{' '}
-                  <span>{booking.adults} Adults{booking.children > 0 ? `, ${booking.children} Children` : ''}</span>
+                  <span>{booking?.adults || 1} Adults{(booking?.children || 0) > 0 ? `, ${booking.children} Children` : ''}</span>
                 </p>
               </div>
             </div>
