@@ -28,10 +28,12 @@ import {
   Calendar,
   DollarSign,
   Receipt,
+  FileText,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import PaymentReceiptModal from '@/components/payments/PaymentReceiptModal'
 import RecordPaymentModal from '@/components/payments/RecordPaymentModal'
+import OfficialInvoiceModal from '@/components/invoices/OfficialInvoiceModal'
 
 type DatePreset = 'all' | 'today' | 'week' | 'month' | 'custom'
 
@@ -40,6 +42,7 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState<(Payment & { booking?: Booking })[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
+  const [invoiceBooking, setInvoiceBooking] = useState<Booking | null>(null)
 
   // Filters
   const [search, setSearch] = useState('')
@@ -458,6 +461,17 @@ export default function PaymentsPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {/* Official Tax Invoice */}
+                          {b && (
+                            <button
+                              onClick={() => setInvoiceBooking(b)}
+                              className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition"
+                              title="Official Tax Invoice"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
                           {/* Print Receipt */}
                           <button
                             onClick={() => setReceiptPayment(p)}
@@ -524,6 +538,14 @@ export default function PaymentsPage() {
         <PaymentReceiptModal
           payment={receiptPayment}
           onClose={() => setReceiptPayment(null)}
+        />
+      )}
+
+      {invoiceBooking && (
+        <OfficialInvoiceModal
+          booking={invoiceBooking}
+          payments={payments.filter(p => (p as any).booking_id === invoiceBooking.id)}
+          onClose={() => setInvoiceBooking(null)}
         />
       )}
     </div>

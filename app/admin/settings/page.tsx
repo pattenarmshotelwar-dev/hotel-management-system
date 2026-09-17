@@ -55,6 +55,11 @@ export default function SettingsPage() {
     wifiNetwork: 'Patten_Guest_WiFi',
     wifiPassword: 'PattenArmsWelcome',
     cleanerPhone: '+44 7700 900123',
+    bankName: 'Barclays Bank',
+    accountName: 'Rumiscapes Ltd',
+    sortCode: '20-91-45',
+    accountNumber: '83920184',
+    paymentTerms: 'Payment due upon receipt. Please quote invoice reference with transfer.',
     cancellationPolicy: 'Free cancellation up to 24 hours prior to check-in. Non-refundable afterwards.',
   })
   const [savingHotelConfig, setSavingHotelConfig] = useState(false)
@@ -610,6 +615,67 @@ export default function SettingsPage() {
                   <p className="text-[11px] text-emerald-700 mt-1">
                     When guests check out or rooms are marked dirty, 1-click WhatsApp alerts will automatically target this number.
                   </p>
+                </div>
+
+                {/* Bank Transfer Details for Invoices */}
+                <div className="sm:col-span-2 bg-blue-50/60 border border-blue-200 p-4 rounded-xl space-y-3">
+                  <div className="border-b border-blue-200 pb-2">
+                    <h4 className="font-bold text-blue-900 text-xs">🏦 Official Invoice Bank Transfer Details (BACS)</h4>
+                    <p className="text-[11px] text-blue-700">These details appear automatically on generated tax invoices for contractor and corporate bank transfers.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Bank Name</label>
+                      <input
+                        type="text"
+                        value={hotelConfig.bankName}
+                        onChange={e => setHotelConfig(c => ({ ...c, bankName: e.target.value }))}
+                        placeholder="Barclays Bank"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Account Name</label>
+                      <input
+                        type="text"
+                        value={hotelConfig.accountName}
+                        onChange={e => setHotelConfig(c => ({ ...c, accountName: e.target.value }))}
+                        placeholder="Rumiscapes Ltd"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Sort Code</label>
+                      <input
+                        type="text"
+                        value={hotelConfig.sortCode}
+                        onChange={e => setHotelConfig(c => ({ ...c, sortCode: e.target.value }))}
+                        placeholder="20-91-45"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Account Number</label>
+                      <input
+                        type="text"
+                        value={hotelConfig.accountNumber}
+                        onChange={e => setHotelConfig(c => ({ ...c, accountNumber: e.target.value }))}
+                        placeholder="83920184"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-mono"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block font-semibold text-slate-700 mb-1">Invoice Payment Terms</label>
+                      <input
+                        type="text"
+                        value={hotelConfig.paymentTerms}
+                        onChange={e => setHotelConfig(c => ({ ...c, paymentTerms: e.target.value }))}
+                        placeholder="Payment due upon receipt. Please quote invoice reference with transfer."
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
