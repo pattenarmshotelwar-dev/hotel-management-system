@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Booking, Payment } from '@/lib/types'
 import { formatCurrency, formatDate, formatDateTime, getBookingStatusColor, getBookingStatusLabel, getBookingSourceLabel, getBookingSourceColor, getPaymentMethodLabel, getPaymentStatusColor, getPaymentStatusLabel, nightCount, getSavedAddonPresets, cn } from '@/lib/utils'
-import { X, CreditCard, Banknote, QrCode, Loader2, Plus, ExternalLink, Printer, Receipt, Tag } from 'lucide-react'
+import { X, CreditCard, Banknote, QrCode, Loader2, Plus, ExternalLink, Printer, Receipt, Tag, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import OfficialInvoiceModal from '@/components/invoices/OfficialInvoiceModal'
+import WhatsAppMessageModal from '@/components/bookings/WhatsAppMessageModal'
 
 interface Props {
   booking: Booking
@@ -21,6 +22,7 @@ export default function BookingDetailModal({ booking, onClose, onUpdated }: Prop
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [showIncidentalForm, setShowIncidentalForm] = useState(false)
   const [showInvoice, setShowInvoice] = useState(false)
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false)
   const [addonPresets, setAddonPresets] = useState<any[]>([])
 
   const [incidentalForm, setIncidentalForm] = useState({
@@ -376,6 +378,13 @@ export default function BookingDetailModal({ booking, onClose, onUpdated }: Prop
                 >
                   <Printer className="w-3.5 h-3.5 text-blue-600" /> Official Invoice
                 </button>
+                <button
+                  onClick={() => setShowWhatsAppModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-semibold rounded-xl hover:bg-emerald-100 transition cursor-pointer"
+                  title="Send Confirmation or Review Request to Guest"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp Guest
+                </button>
               </div>
             ) : (
               <div className="bg-slate-50 rounded-xl p-4 space-y-3">
@@ -435,6 +444,14 @@ export default function BookingDetailModal({ booking, onClose, onUpdated }: Prop
           booking={booking}
           payments={payments}
           onClose={() => setShowInvoice(false)}
+        />
+      )}
+
+      {showWhatsAppModal && (
+        <WhatsAppMessageModal
+          booking={booking}
+          defaultType={booking.status === 'checked_out' ? 'review' : 'confirmation'}
+          onClose={() => setShowWhatsAppModal(false)}
         />
       )}
     </div>

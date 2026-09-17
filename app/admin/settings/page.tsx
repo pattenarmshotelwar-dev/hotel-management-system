@@ -59,8 +59,8 @@ export default function SettingsPage() {
     accountName: 'Rumiscapes Ltd',
     sortCode: '20-91-45',
     accountNumber: '83920184',
-    paymentTerms: 'Payment due upon receipt. Please quote invoice reference with transfer.',
     cancellationPolicy: 'Free cancellation up to 24 hours prior to check-in. Non-refundable afterwards.',
+    googleReviewLink: 'https://g.page/r/pattenarmshotel/review',
   })
   const [savingHotelConfig, setSavingHotelConfig] = useState(false)
   const [addonPresets, setAddonPresets] = useState<any[]>(DEFAULT_ADDON_PRESETS)
@@ -656,6 +656,26 @@ export default function SettingsPage() {
                   />
                   <p className="text-[11px] text-emerald-700 mt-1">
                     When guests check out or rooms are marked dirty, 1-click WhatsApp alerts will automatically target this number.
+                  </p>
+                </div>
+
+                {/* Google Review Link for Automated Checkout Requests */}
+                <div className="sm:col-span-2 bg-amber-50/70 border border-amber-200 p-3.5 rounded-xl">
+                  <label className="block font-bold text-amber-900 mb-1 flex items-center gap-1.5">
+                    ⭐ Hotel Google Review Link (for automated post-stay WhatsApps)
+                  </label>
+                  <input
+                    type="url"
+                    value={hotelConfig.googleReviewLink || ''}
+                    onChange={e => {
+                      const val = e.target.value
+                      setHotelConfig(c => ({ ...c, googleReviewLink: val }))
+                    }}
+                    placeholder="https://g.page/r/pattenarmshotel/review"
+                    className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white text-xs font-mono"
+                  />
+                  <p className="text-[11px] text-amber-800 mt-1">
+                    Included in post-checkout automated review requests sent to departing guests to boost TripAdvisor & Google ratings.
                   </p>
                 </div>
 

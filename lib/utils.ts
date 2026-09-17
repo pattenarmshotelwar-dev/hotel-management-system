@@ -230,6 +230,101 @@ export const DEFAULT_ADDON_PRESETS: Array<{
   { id: 'addon_damage', name: 'Damage / Smoking / Deep Clean Charge', price: 50.0, category: 'damage', description: 'Incident fee for room damage or unauthorized smoking' },
 ]
 
+export function sendGuestWhatsAppMessage({
+  phone = '',
+  text = '',
+}: {
+  phone?: string
+  text: string
+}) {
+  const cleanPhone = phone.replace(/[^0-9]/g, '')
+  const encodedText = encodeURIComponent(text)
+  const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodedText}` : `https://wa.me/?text=${encodedText}`
+  if (typeof window !== 'undefined') {
+    window.open(url, '_blank')
+  }
+}
+
+export function generateBookingConfirmationWhatsAppText({
+  guestName,
+  bookingRef,
+  roomNumber,
+  roomType,
+  checkInDate,
+  checkOutDate,
+  totalAmount,
+  hotelConfig,
+}: {
+  guestName: string
+  bookingRef: string
+  roomNumber?: string
+  roomType?: string
+  checkInDate: string
+  checkOutDate: string
+  totalAmount: number
+  hotelConfig?: {
+    name?: string
+    phone?: string
+    address?: string
+    checkInTime?: string
+    checkOutTime?: string
+    wifiNetwork?: string
+    wifiPassword?: string
+  }
+}): string {
+  const hotelName = hotelConfig?.name || 'The Patten Arms Hotel'
+  const checkIn = hotelConfig?.checkInTime || '15:00'
+  const checkOut = hotelConfig?.checkOutTime || '11:00'
+  const phone = hotelConfig?.phone || '+44 1925 650144'
+  const address = hotelConfig?.address || 'Parker Street, Warrington WA1 1HG'
+  const wifi = hotelConfig?.wifiNetwork ? `📶 *Wi-Fi:* ${hotelConfig.wifiNetwork} (Password: ${hotelConfig.wifiPassword || 'See Reception'})` : ''
+
+  return (
+    `🏨 *Reservation Confirmation — ${hotelName}*\n\n` +
+    `Dear ${guestName},\n\n` +
+    `Thank you for choosing to stay with us! Your reservation is confirmed.\n\n` +
+    `📋 *Booking Ref:* ${bookingRef}\n` +
+    (roomNumber ? `🛏 *Room:* ${roomNumber} (${roomType || 'Standard'})\n` : '') +
+    `📅 *Check-in:* ${checkInDate} (from ${checkIn})\n` +
+    `📅 *Check-out:* ${checkOutDate} (by ${checkOut})\n` +
+    `💷 *Total Amount:* £${totalAmount.toFixed(2)}\n\n` +
+    `📍 *Address:* ${address}\n` +
+    `📞 *Reception Phone:* ${phone}\n` +
+    (wifi ? `${wifi}\n\n` : '\n') +
+    `🚗 Free on-site parking is available for residents. Please let us know if you require early check-in or have any special requests.\n\n` +
+    `We look forward to welcoming you soon!\n\n` +
+    `Warm regards,\n*The Patten Arms Hotel Team*`
+  )
+}
+
+export function generatePostStayReviewWhatsAppText({
+  guestName,
+  bookingRef,
+  hotelConfig,
+  customReviewLink,
+}: {
+  guestName: string
+  bookingRef: string
+  hotelConfig?: {
+    name?: string
+  }
+  customReviewLink?: string
+}): string {
+  const hotelName = hotelConfig?.name || 'The Patten Arms Hotel'
+  const reviewLink = customReviewLink || 'https://g.page/r/pattenarmshotel/review'
+
+  return (
+    `🌟 *Thank You for Staying with Us — ${hotelName}*\n\n` +
+    `Dear ${guestName},\n\n` +
+    `We hope you had a restful and enjoyable stay with us at ${hotelName} (Ref: ${bookingRef})!\n\n` +
+    `As an independent historic hotel, your honest feedback means the world to our entire team. Could you take 30 seconds to share your experience with other travellers?\n\n` +
+    `⭐ *Leave a Google Review here:*\n${reviewLink}\n\n` +
+    `If anything was not 100% to your satisfaction during your stay, please reply directly to this message so our management team can make it right.\n\n` +
+    `We hope to welcome you back next time you are visiting Warrington!\n\n` +
+    `Warmest regards,\n*The Patten Arms Team*`
+  )
+}
+
 export function getSavedAddonPresets(): typeof DEFAULT_ADDON_PRESETS {
   if (typeof window === 'undefined') return DEFAULT_ADDON_PRESETS
   const saved = localStorage.getItem('patten_addon_presets')

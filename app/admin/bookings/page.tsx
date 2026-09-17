@@ -30,6 +30,7 @@ import {
   CreditCard,
   BedDouble,
   CheckCircle2,
+  MessageSquare,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import NewBookingModal from '@/components/bookings/NewBookingModal'
@@ -37,6 +38,7 @@ import BookingDetailModal from '@/components/bookings/BookingDetailModal'
 import GuestRegistrationCardModal from '@/components/bookings/GuestRegistrationCardModal'
 import CheckoutWhatsAppPromptModal from '@/components/housekeeping/CheckoutWhatsAppPromptModal'
 import OfficialInvoiceModal from '@/components/invoices/OfficialInvoiceModal'
+import WhatsAppMessageModal from '@/components/bookings/WhatsAppMessageModal'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
@@ -50,6 +52,7 @@ function BookingsContent() {
   const [loading, setLoading] = useState(true)
   const [checkoutPromptBooking, setCheckoutPromptBooking] = useState<Booking | null>(null)
   const [invoiceBooking, setInvoiceBooking] = useState<Booking | null>(null)
+  const [whatsAppModalBooking, setWhatsAppModalBooking] = useState<Booking | null>(null)
 
   // Filters
   const [activeTab, setActiveTab] = useState<QuickTab>('all')
@@ -590,6 +593,15 @@ function BookingsContent() {
                             <FileText className="w-4 h-4 text-blue-600" />
                           </button>
 
+                          {/* WhatsApp Confirmation / Review */}
+                          <button
+                            onClick={() => setWhatsAppModalBooking(booking)}
+                            className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                            title={booking.status === 'checked_out' ? 'Send Review Request via WhatsApp' : 'Send Booking Confirmation via WhatsApp'}
+                          >
+                            <MessageSquare className="w-4 h-4 text-emerald-600" />
+                          </button>
+
                           {/* Print Registration / Folio */}
                           <button
                             onClick={() => setRegCardBooking(booking)}
@@ -698,6 +710,14 @@ function BookingsContent() {
         <CheckoutWhatsAppPromptModal
           booking={checkoutPromptBooking}
           onClose={() => setCheckoutPromptBooking(null)}
+        />
+      )}
+
+      {whatsAppModalBooking && (
+        <WhatsAppMessageModal
+          booking={whatsAppModalBooking}
+          defaultType={whatsAppModalBooking.status === 'checked_out' ? 'review' : 'confirmation'}
+          onClose={() => setWhatsAppModalBooking(null)}
         />
       )}
     </div>
