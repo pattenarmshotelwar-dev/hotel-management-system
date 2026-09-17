@@ -1,16 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import {
-  BedDouble,
-  Users,
-  TrendingUp,
-  ArrowUpRight,
-  ArrowDownRight,
-  Calendar,
-  Sparkles,
-  AlertTriangle,
-  CheckCircle2,
-} from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, CheckCircle2 } from 'lucide-react'
+import { DashboardStatCards } from '@/components/dashboard-stat-cards'
 
 async function getDashboardStats() {
   const supabase = await createClient()
@@ -30,8 +21,8 @@ async function getDashboardStats() {
     supabase.from('bookings').select('*, room:rooms(room_number, room_type)').eq('check_in_date', today).in('status', ['confirmed', 'checked_in']),
     supabase.from('bookings').select('*, room:rooms(room_number, room_type)').eq('check_out_date', today).in('status', ['confirmed', 'checked_in']),
     supabase.from('bookings').select('id').eq('status', 'checked_in'),
-    supabase.from('rooms').select('id').eq('cleaning_status', 'dirty'),
-    supabase.from('maintenance_tickets').select('id').eq('status', 'open'),
+    supabase.from('rooms').select('id, room_number, room_type, cleaning_status').eq('cleaning_status', 'dirty').eq('is_active', true),
+    supabase.from('maintenance_tickets').select('id, title, priority, status, room:rooms(room_number)').eq('status', 'open').order('created_at', { ascending: false }),
     supabase.from('payments').select('amount').eq('status', 'succeeded').gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
     supabase.from('bookings').select('*, room:rooms(room_number, room_type)').order('created_at', { ascending: false }).limit(5),
   ])
@@ -49,7 +40,9 @@ async function getDashboardStats() {
     todayArrivals: todayArrivals ?? [],
     todayDepartures: todayDepartures ?? [],
     dirtyRoomsCount: dirtyRooms?.length ?? 0,
+    dirtyRooms: dirtyRooms ?? [],
     openTicketsCount: openTickets?.length ?? 0,
+    openTickets: openTickets ?? [],
     recentBookings: recentBookings ?? [],
   }
 }
@@ -61,36 +54,16 @@ export default async function AdminDashboard() {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard
-          title="Occupancy Rate"
-          value={`${stats.occupancyRate}%`}
-          sub={`${stats.occupiedRooms} / ${stats.totalRooms} rooms`}
-          icon={<BedDouble className="w-5 h-5" />}
-          color="blue"
-        />
-        <StatCard
-          title="Monthly Revenue"
-          value={formatCurrency(stats.monthRevenue)}
-          sub={`${today.toLocaleString('en-GB', { month: 'long' })} ${today.getFullYear()}`}
-          icon={<TrendingUp className="w-5 h-5" />}
-          color="green"
-        />
-        <StatCard
-          title="Rooms to Clean"
-          value={String(stats.dirtyRoomsCount)}
-          sub="Pending housekeeping"
-          icon={<Sparkles className="w-5 h-5" />}
-          color="yellow"
-        />
-        <StatCard
-          title="Open Tickets"
-          value={String(stats.openTicketsCount)}
-          sub="Maintenance issues"
-          icon={<AlertTriangle className="w-5 h-5" />}
-          color="red"
-        />
-      </div>
+      <DashboardStatCards
+        occupancyRate={stats.occupancyRate}
+        occupiedRooms={stats.occupiedRooms}
+        totalRooms={stats.totalRooms}
+        monthRevenue={stats.monthRevenue}
+        dirtyRoomsCount={stats.dirtyRoomsCount}
+        dirtyRooms={stats.dirtyRooms as any[]}
+        openTicketsCount={stats.openTicketsCount}
+        openTickets={stats.openTickets as any[]}
+      />
 
       {/* Today's Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -216,35 +189,6 @@ export default async function AdminDashboard() {
           </table>
         </div>
       </div>
-    </div>
-  )
-}
-
-function StatCard({ title, value, sub, icon, color }: {
-  title: string
-  value: string
-  sub: string
-  icon: React.ReactNode
-  color: 'blue' | 'green' | 'yellow' | 'red'
-}) {
-  const colorMap = {
-    blue: { bg: 'bg-blue-50', icon: 'bg-blue-100 text-blue-600', value: 'text-blue-700' },
-    green: { bg: 'bg-green-50', icon: 'bg-green-100 text-green-600', value: 'text-green-700' },
-    yellow: { bg: 'bg-yellow-50', icon: 'bg-yellow-100 text-yellow-600', value: 'text-yellow-700' },
-    red: { bg: 'bg-red-50', icon: 'bg-red-100 text-red-600', value: 'text-red-700' },
-  }
-  const c = colorMap[color]
-
-  return (
-    <div className={`${c.bg} rounded-2xl p-6 border border-slate-200`}>
-      <div className="flex items-start justify-between mb-4">
-        <div className={`w-10 h-10 ${c.icon} rounded-xl flex items-center justify-center`}>
-          {icon}
-        </div>
-      </div>
-      <p className={`text-2xl font-bold ${c.value}`}>{value}</p>
-      <p className="text-sm font-medium text-slate-700 mt-1">{title}</p>
-      <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
     </div>
   )
 }
