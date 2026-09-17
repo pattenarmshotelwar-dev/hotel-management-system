@@ -54,6 +54,7 @@ export default function SettingsPage() {
     checkOutTime: '11:00',
     wifiNetwork: 'Patten_Guest_WiFi',
     wifiPassword: 'PattenArmsWelcome',
+    cleanerPhone: '+44 7700 900123',
     cancellationPolicy: 'Free cancellation up to 24 hours prior to check-in. Non-refundable afterwards.',
   })
   const [savingHotelConfig, setSavingHotelConfig] = useState(false)
@@ -589,6 +590,26 @@ export default function SettingsPage() {
                     onChange={e => setHotelConfig(c => ({ ...c, wifiPassword: e.target.value }))}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
+                </div>
+
+                <div className="sm:col-span-2 bg-emerald-50/70 border border-emerald-200 p-3.5 rounded-xl">
+                  <label className="block font-bold text-emerald-900 mb-1 flex items-center gap-1.5">
+                    📲 Housekeeping Team WhatsApp Number / Group
+                  </label>
+                  <input
+                    type="tel"
+                    value={hotelConfig.cleanerPhone}
+                    onChange={e => {
+                      const val = e.target.value
+                      setHotelConfig(c => ({ ...c, cleanerPhone: val }))
+                      localStorage.setItem('patten_cleaner_phone', val)
+                    }}
+                    placeholder="+44 7700 900123"
+                    className="w-full px-3 py-2 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white text-xs font-mono"
+                  />
+                  <p className="text-[11px] text-emerald-700 mt-1">
+                    When guests check out or rooms are marked dirty, 1-click WhatsApp alerts will automatically target this number.
+                  </p>
                 </div>
               </div>
 

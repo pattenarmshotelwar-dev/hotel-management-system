@@ -181,3 +181,34 @@ export function generateBookingReference(): string {
   }
   return result
 }
+
+export function sendCleanerWhatsAppMessage({
+  phone = '',
+  roomNumber,
+  roomType = 'Standard',
+  floor = 1,
+  priority = 'Normal',
+  notes = '',
+}: {
+  phone?: string
+  roomNumber: string | number
+  roomType?: string
+  floor?: number
+  priority?: 'Normal' | 'Urgent (Arrival Today)' | 'Guest Request'
+  notes?: string
+}) {
+  const cleanPhone = phone.replace(/[^0-9]/g, '')
+  const text = encodeURIComponent(
+    `🏨 *Patten Arms Hotel — Housekeeping Alert*\n\n` +
+    `🧹 *Room:* Room ${roomNumber} (Floor ${floor} — ${roomType})\n` +
+    `⚡ *Priority:* ${priority}\n` +
+    (notes ? `📝 *Notes:* ${notes}\n` : '') +
+    `🕒 *Time:* ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}\n\n` +
+    `👉 Please update status once complete:\nhttps://hotel-management-system-one-lovat.vercel.app/housekeeping`
+  )
+
+  const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${text}` : `https://wa.me/?text=${text}`
+  if (typeof window !== 'undefined') {
+    window.open(url, '_blank')
+  }
+}

@@ -25,9 +25,11 @@ import {
   Building,
   Layers,
   Search,
+  MessageSquare,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import NewTicketModal from '@/components/housekeeping/NewTicketModal'
+import WhatsAppAlertModal from '@/components/housekeeping/WhatsAppAlertModal'
 
 export default function HousekeepingAdminPage() {
   const supabase = createClient()
@@ -46,6 +48,7 @@ export default function HousekeepingAdminPage() {
 
   // Modals & Actions
   const [showNewTicketModal, setShowNewTicketModal] = useState(false)
+  const [whatsAppModalRoom, setWhatsAppModalRoom] = useState<Room | null>(null)
   const [updatingRoomId, setUpdatingRoomId] = useState<string | null>(null)
 
   const todayStr = new Date().toISOString().split('T')[0]
@@ -413,8 +416,19 @@ export default function HousekeepingAdminPage() {
                         </span>
                       </div>
 
+                      {/* 1-Click WhatsApp Dispatch Button */}
+                      <div className="mt-3">
+                        <button
+                          onClick={() => setWhatsAppModalRoom(room)}
+                          className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-semibold transition"
+                          title="Send WhatsApp cleaning task to housekeeper"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp Cleaners
+                        </button>
+                      </div>
+
                       {/* Status Selector Dropdown */}
-                      <div className="mt-3 pt-2.5 border-t border-slate-100">
+                      <div className="mt-2 pt-2 border-t border-slate-100">
                         <label className="text-[10px] text-slate-400 block mb-1">Set Cleaning Status:</label>
                         <div className="relative">
                           {isUpdating ? (
@@ -599,6 +613,15 @@ export default function HousekeepingAdminPage() {
             fetchData()
             setShowNewTicketModal(false)
           }}
+        />
+      )}
+
+      {/* WhatsApp Dispatch Modal */}
+      {whatsAppModalRoom && (
+        <WhatsAppAlertModal
+          room={whatsAppModalRoom}
+          hasArrivalToday={todayArrivals.includes(whatsAppModalRoom.id)}
+          onClose={() => setWhatsAppModalRoom(null)}
         />
       )}
     </div>

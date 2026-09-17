@@ -35,6 +35,7 @@ import { toast } from 'sonner'
 import NewBookingModal from '@/components/bookings/NewBookingModal'
 import BookingDetailModal from '@/components/bookings/BookingDetailModal'
 import GuestRegistrationCardModal from '@/components/bookings/GuestRegistrationCardModal'
+import CheckoutWhatsAppPromptModal from '@/components/housekeeping/CheckoutWhatsAppPromptModal'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
@@ -46,6 +47,7 @@ function BookingsContent() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [rooms, setRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
+  const [checkoutPromptBooking, setCheckoutPromptBooking] = useState<Booking | null>(null)
 
   // Filters
   const [activeTab, setActiveTab] = useState<QuickTab>('all')
@@ -82,11 +84,21 @@ function BookingsContent() {
   }
 
   const handleStatusChange = async (bookingId: string, newStatus: string) => {
+    const bookingToUpdate = bookings.find(b => b.id === bookingId)
     const { error } = await supabase.from('bookings').update({ status: newStatus }).eq('id', bookingId)
     if (error) {
       toast.error('Failed to update status')
     } else {
       toast.success(`Booking marked as ${getBookingStatusLabel(newStatus as any)}`)
+
+      // If guest checked out, mark room as dirty and trigger WhatsApp prompt
+      if (newStatus === 'checked_out' && bookingToUpdate) {
+        if (bookingToUpdate.room_id) {
+          await supabase.from('rooms').update({ cleaning_status: 'dirty' }).eq('id', bookingToUpdate.room_id)
+        }
+        setCheckoutPromptBooking(bookingToUpdate)
+      }
+
       fetchData()
     }
   }
@@ -660,6 +672,13 @@ function BookingsContent() {
           booking={regCardBooking}
           payments={(regCardBooking as any).payments || []}
           onClose={() => setRegCardBooking(null)}
+        />
+      )}
+
+      {checkoutPromptBooking && (
+        <CheckoutWhatsAppPromptModal
+          booking={checkoutPromptBooking}
+          onClose={() => setCheckoutPromptBooking(null)}
         />
       )}
     </div>
