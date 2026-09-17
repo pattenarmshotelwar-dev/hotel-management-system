@@ -163,6 +163,26 @@ export interface LuggageItem {
   notes?: string
 }
 
+export interface LostFoundItem {
+  id: string
+  item_reference: string // e.g. LF-101
+  title: string // e.g. "Apple iPhone 14 in black case"
+  category: 'electronics' | 'clothing' | 'keys' | 'jewellery' | 'documents' | 'toiletries' | 'other'
+  room_number?: string
+  found_location: string // e.g. "Room 14 under bed"
+  found_date: string
+  found_by: string // e.g. "Housekeeper Maria"
+  status: 'unclaimed' | 'claimed' | 'disposed' | 'donated'
+  guest_name?: string
+  guest_phone?: string
+  guest_notified?: boolean
+  claimed_at?: string | null
+  disposal_date?: string | null
+  storage_bin: string // e.g. "Safe Box 2", "Lost Property Cupboard"
+  notes?: string
+  created_at: string
+}
+
 export interface IcalSyncLog {
   id: string
   room_id: string | null
