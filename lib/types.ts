@@ -43,6 +43,10 @@ export interface Guest {
   country: string | null
   address: string | null
   id_passport_number: string | null
+  vehicle_reg?: string | null
+  is_vip?: boolean
+  is_blacklisted?: boolean
+  blacklist_reason?: string | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -141,6 +145,22 @@ export interface AddonItem {
   category?: 'breakfast' | 'checkin_checkout' | 'parking' | 'pet' | 'fee' | 'damage' | 'other'
   description?: string
   quantity?: number
+}
+
+export interface LuggageItem {
+  id: string
+  tag_number: string // e.g. LUG-101
+  guest_name: string
+  guest_phone?: string
+  room_number?: string
+  bag_count: number
+  bag_description: string // e.g. "2x Large black suitcases + 1 laptop bag"
+  storage_location: string // e.g. "Luggage Cupboard 1", "Behind Reception"
+  check_in_time: string
+  expected_collection_time?: string
+  collected_at?: string | null
+  status: 'stored' | 'collected'
+  notes?: string
 }
 
 export interface IcalSyncLog {
