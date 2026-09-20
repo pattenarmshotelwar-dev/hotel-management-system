@@ -68,7 +68,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Sidebar */}
       <aside className={cn(
-        'fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 transform transition-transform duration-300 lg:relative lg:translate-x-0 flex flex-col',
+        'fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 transform transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen flex flex-col',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         {/* Logo */}
@@ -113,7 +113,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        {/* Logout */}
+        {/* Logout in Sidebar */}
         <div className="px-3 py-4 border-t border-slate-700">
           <button
             onClick={handleLogout}
@@ -127,22 +127,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-4">
+        {/* Top bar with Permanent Sign Out */}
+        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3.5 flex items-center gap-3 sm:gap-4 sticky top-0 z-20 shadow-xs">
           <button
-            className="lg:hidden text-slate-500 hover:text-slate-900"
+            className="lg:hidden text-slate-500 hover:text-slate-900 p-1 rounded-lg hover:bg-slate-100"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open sidebar"
           >
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h2 className="text-slate-800 font-semibold">
+            <h2 className="text-slate-800 font-semibold text-base sm:text-lg">
               {navItems.find(n => pathname === n.href || (n.href !== '/admin' && pathname.startsWith(n.href)))?.label ?? 'Dashboard'}
             </h2>
           </div>
           <div className="text-xs text-slate-400 hidden sm:block">
             {new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
+          {/* Top Bar Sign Out Button (Visible on all devices and window sizes) */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-700 hover:text-red-600 bg-slate-100 hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-lg transition-colors cursor-pointer shadow-xs"
+            title="Sign Out"
+          >
+            <LogOut className="w-4 h-4 text-slate-500" />
+            <span>Sign Out</span>
+          </button>
         </header>
 
         {/* Page content */}

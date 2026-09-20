@@ -198,9 +198,17 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-slate-500 text-sm mt-6">
-          Created by UVDigital
-        </p>
+        <div className="flex items-center justify-center gap-2 text-slate-500 text-xs mt-6 opacity-75 hover:opacity-100 transition-opacity">
+          <span>Created by</span>
+          <Image
+            src="/uv-digital-logo.png"
+            alt="UV Digital"
+            width={72}
+            height={22}
+            className="h-5 w-auto object-contain rounded-sm inline-block"
+            unoptimized
+          />
+        </div>
       </div>
     </div>
   )
