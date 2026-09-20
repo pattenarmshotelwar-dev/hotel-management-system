@@ -31,6 +31,7 @@ import {
   BedDouble,
   CheckCircle2,
   MessageSquare,
+  Printer,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import NewBookingModal from '@/components/bookings/NewBookingModal'
@@ -76,16 +77,22 @@ function BookingsContent() {
 
   const fetchData = async () => {
     setLoading(true)
-    const [{ data: bookingsData }, { data: roomsData }] = await Promise.all([
-      supabase
-        .from('bookings')
-        .select('*, room:rooms(room_number, room_type), payments(id, amount, status, method, created_at)')
-        .order('created_at', { ascending: false }),
-      supabase.from('rooms').select('*').eq('is_active', true).order('room_number'),
-    ])
-    setBookings((bookingsData as any) ?? [])
-    setRooms(roomsData ?? [])
-    setLoading(false)
+    try {
+      const [{ data: bookingsData }, { data: roomsData }] = await Promise.all([
+        supabase
+          .from('bookings')
+          .select('*, room:rooms(room_number, room_type), payments(id, amount, status, method, created_at)')
+          .order('created_at', { ascending: false }),
+        supabase.from('rooms').select('*').eq('is_active', true).order('room_number'),
+      ])
+      setBookings((bookingsData as any) ?? [])
+      setRooms(roomsData ?? [])
+    } catch (err) {
+      console.error('Error fetching bookings data:', err)
+      toast.error('Failed to load some bookings data')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleStatusChange = async (bookingId: string, newStatus: string) => {
