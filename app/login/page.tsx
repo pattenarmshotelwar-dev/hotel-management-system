@@ -14,10 +14,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [role, setRole] = useState<'admin' | 'housekeeping'>('admin')
+  const [role, setRole] = useState<'admin' | 'frontdesk' | 'housekeeping'>('admin')
 
-  // Housekeeping shared credentials (stored in env on client)
+  // Housekeeping & Front Desk shared credentials
   const HOUSEKEEPING_EMAIL = process.env.NEXT_PUBLIC_HOUSEKEEPING_EMAIL || 'housekeeping@hotel.com'
+  const FRONTDESK_EMAIL = process.env.NEXT_PUBLIC_FRONTDESK_EMAIL || 'frontdesk@hotel.com'
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,8 +41,10 @@ export default function LoginPage() {
         // ignore
       }
 
-      // Determine role by email
-      if (data.user.email === HOUSEKEEPING_EMAIL) {
+      // Determine destination by role
+      if (role === 'frontdesk' || data.user.email === FRONTDESK_EMAIL) {
+        router.push('/frontdesk')
+      } else if (role === 'housekeeping' || data.user.email === HOUSEKEEPING_EMAIL) {
         router.push('/housekeeping')
       } else {
         router.push('/admin')
@@ -74,7 +77,7 @@ export default function LoginPage() {
         <div className="flex bg-slate-800 rounded-xl p-1 mb-6">
           <button
             onClick={() => { setRole('admin'); setEmail(''); setPassword('') }}
-            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+            className={`flex-1 py-2 px-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
               role === 'admin'
                 ? 'bg-blue-600 text-white shadow'
                 : 'text-slate-400 hover:text-white'
@@ -83,8 +86,18 @@ export default function LoginPage() {
             Management
           </button>
           <button
+            onClick={() => { setRole('frontdesk'); setEmail(FRONTDESK_EMAIL); setPassword('') }}
+            className={`flex-1 py-2 px-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+              role === 'frontdesk'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Front Desk
+          </button>
+          <button
             onClick={() => { setRole('housekeeping'); setEmail(HOUSEKEEPING_EMAIL); setPassword('') }}
-            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+            className={`flex-1 py-2 px-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
               role === 'housekeeping'
                 ? 'bg-blue-600 text-white shadow'
                 : 'text-slate-400 hover:text-white'
@@ -107,6 +120,22 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@hotel.com"
+                  required
+                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                />
+              </div>
+            )}
+
+            {role === 'frontdesk' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Front Desk Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="frontdesk@hotel.com"
                   required
                   className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                 />
