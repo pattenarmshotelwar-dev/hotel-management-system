@@ -487,15 +487,6 @@ export default function FrontDeskPage() {
               </div>
             </button>
 
-            {/* Quick Link to Management */}
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-medium transition"
-            >
-              <span>Management</span>
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-            </Link>
-
             {/* Sign Out */}
             <button
               onClick={async () => {

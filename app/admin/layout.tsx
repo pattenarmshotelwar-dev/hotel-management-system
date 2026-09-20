@@ -18,7 +18,6 @@ import {
   LogOut,
   Menu,
   X,
-  Sparkles,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -26,7 +25,6 @@ import Image from 'next/image'
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/frontdesk', label: 'Front Desk Portal', icon: Sparkles },
   { href: '/admin/calendar', label: 'Calendar', icon: Calendar },
   { href: '/admin/bookings', label: 'Bookings', icon: BookOpen },
   { href: '/admin/pricing', label: 'Pricing & Yield', icon: TrendingUp },
@@ -142,17 +140,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {navItems.find(n => pathname === n.href || (n.href !== '/admin' && pathname.startsWith(n.href)))?.label ?? 'Dashboard'}
             </h2>
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/frontdesk"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-xl text-xs font-semibold transition"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              Front Desk Portal
-            </Link>
-            <div className="text-xs text-slate-400 hidden sm:block">
-              {new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </div>
+          <div className="text-xs text-slate-400 hidden sm:block">
+            {new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
         </header>
 

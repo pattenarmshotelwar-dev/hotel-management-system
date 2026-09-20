@@ -18,13 +18,34 @@ export default function LoginPage() {
 
   // Housekeeping & Front Desk shared credentials
   const HOUSEKEEPING_EMAIL = process.env.NEXT_PUBLIC_HOUSEKEEPING_EMAIL || 'housekeeping@hotel.com'
-  const FRONTDESK_EMAIL = process.env.NEXT_PUBLIC_FRONTDESK_EMAIL || 'frontdesk@hotel.com'
+  const FRONTDESK_EMAIL = 'frontdesk@patternarmswarhotel.co.uk'
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    const loginEmail = role === 'frontdesk' ? FRONTDESK_EMAIL : (role === 'housekeeping' ? HOUSEKEEPING_EMAIL : email)
+
+    let { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
+
+    if (error && role === 'frontdesk') {
+      try {
+        const res = await fetch('/api/auth/setup-frontdesk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: FRONTDESK_EMAIL, password }),
+        })
+        if (res.ok) {
+          const retry = await supabase.auth.signInWithPassword({ email: FRONTDESK_EMAIL, password })
+          if (!retry.error && retry.data.user) {
+            data = retry.data
+            error = null
+          }
+        }
+      } catch (setupErr) {
+        console.error('Setup error:', setupErr)
+      }
+    }
 
     if (error) {
       toast.error(error.message)
@@ -32,7 +53,7 @@ export default function LoginPage() {
       return
     }
 
-    if (data.user) {
+    if (data?.user) {
       // Set active session marker for inactivity tracking
       try {
         localStorage.setItem('patten_hotel_last_activity', Date.now().toString())
@@ -127,18 +148,12 @@ export default function LoginPage() {
             )}
 
             {role === 'frontdesk' && (
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Front Desk Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="frontdesk@hotel.com"
-                  required
-                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                />
+              <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600">
+                <p className="text-slate-300 text-sm font-medium">Front Desk Reception Login</p>
+                <p className="text-slate-400 text-xs mt-1">
+                  Account: <span className="text-blue-400 font-mono">frontdesk@patternarmswarhotel.co.uk</span>
+                </p>
+                <p className="text-slate-400 text-xs mt-0.5">Enter the front desk password below</p>
               </div>
             )}
 

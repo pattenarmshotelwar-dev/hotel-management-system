@@ -31,11 +31,19 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/api/ical/export') ||
+    pathname.startsWith('/api/auth/') ||
     pathname.match(/\.(jpg|jpeg|png|gif|svg|webp|ico|pdf|txt)$/i)
   ) {
     if (user && pathname === '/login') {
       const url = request.nextUrl.clone()
-      url.pathname = '/admin'
+      const email = user.email?.toLowerCase() || ''
+      if (email === 'frontdesk@patternarmswarhotel.co.uk' || email.startsWith('frontdesk')) {
+        url.pathname = '/frontdesk'
+      } else if (email.startsWith('housekeeping')) {
+        url.pathname = '/housekeeping'
+      } else {
+        url.pathname = '/admin'
+      }
       const redirectResponse = NextResponse.redirect(url)
       supabaseResponse.cookies.getAll().forEach((cookie) => {
         redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
@@ -49,6 +57,33 @@ export async function middleware(request: NextRequest) {
   if (!user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    const redirectResponse = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
+    })
+    return redirectResponse
+  }
+
+  // Strict role separation:
+  const userEmail = user.email?.toLowerCase() || ''
+  const isFrontDesk = userEmail === 'frontdesk@patternarmswarhotel.co.uk' || userEmail.startsWith('frontdesk')
+  const isHousekeeping = userEmail.startsWith('housekeeping')
+
+  // Front desk cannot access admin or housekeeping routes
+  if (isFrontDesk && (pathname.startsWith('/admin') || pathname.startsWith('/housekeeping'))) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/frontdesk'
+    const redirectResponse = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
+    })
+    return redirectResponse
+  }
+
+  // Housekeeping cannot access admin or frontdesk routes
+  if (isHousekeeping && (pathname.startsWith('/admin') || pathname.startsWith('/frontdesk'))) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/housekeeping'
     const redirectResponse = NextResponse.redirect(url)
     supabaseResponse.cookies.getAll().forEach((cookie) => {
       redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
