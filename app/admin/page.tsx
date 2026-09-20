@@ -15,33 +15,50 @@ async function getDashboardStats() {
   const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-  const [
-    { data: rooms },
-    { data: todayArrivals },
-    { data: todayDepartures },
-    { data: inHouseBookings },
-    { data: dirtyRooms },
-    { data: openTickets },
-    { data: monthlyPayments },
-    { data: recentBookings },
-    { data: revenueByDay },
-    { data: forecastBookings },
-    { data: overdueCheckouts },
-    { data: monthlyBookings },
-  ] = await Promise.all([
-    supabase.from('rooms').select('*').eq('is_active', true).order('room_number'),
-    supabase.from('bookings').select('*, room:rooms(room_number, room_type)').eq('check_in_date', today).in('status', ['confirmed', 'checked_in']),
-    supabase.from('bookings').select('*, room:rooms(room_number, room_type)').eq('check_out_date', today).in('status', ['confirmed', 'checked_in']),
-    supabase.from('bookings').select('id, room_id').eq('status', 'checked_in'),
-    supabase.from('rooms').select('id, room_number, room_type, cleaning_status').eq('cleaning_status', 'dirty').eq('is_active', true),
-    supabase.from('maintenance_tickets').select('id, title, priority, status, room:rooms(room_number)').eq('status', 'open').order('created_at', { ascending: false }),
-    supabase.from('payments').select('amount').eq('status', 'succeeded').gte('created_at', monthStart),
-    supabase.from('bookings').select('*, room:rooms(room_number, room_type)').order('created_at', { ascending: false }).limit(5),
-    supabase.from('payments').select('amount, created_at').eq('status', 'succeeded').gte('created_at', sevenDaysAgo),
-    supabase.from('bookings').select('check_in_date, check_out_date, room_id').in('status', ['confirmed', 'checked_in']).gte('check_out_date', today).lte('check_in_date', sevenDaysFromNow),
-    supabase.from('bookings').select('id, guest_first_name, guest_last_name, check_out_date, room:rooms(room_number)').eq('status', 'checked_in').lt('check_out_date', today),
-    supabase.from('bookings').select('check_in_date, check_out_date, total_amount').in('status', ['confirmed', 'checked_in', 'checked_out']).gte('check_in_date', monthStart),
-  ])
+  let rooms: any[] | null = []
+  let todayArrivals: any[] | null = []
+  let todayDepartures: any[] | null = []
+  let inHouseBookings: any[] | null = []
+  let dirtyRooms: any[] | null = []
+  let openTickets: any[] | null = []
+  let monthlyPayments: any[] | null = []
+  let recentBookings: any[] | null = []
+  let revenueByDay: any[] | null = []
+  let forecastBookings: any[] | null = []
+  let overdueCheckouts: any[] | null = []
+  let monthlyBookings: any[] | null = []
+
+  try {
+    const results = await Promise.all([
+      supabase.from('rooms').select('*').eq('is_active', true).order('room_number'),
+      supabase.from('bookings').select('*, room:rooms(room_number, room_type)').eq('check_in_date', today).in('status', ['confirmed', 'checked_in']),
+      supabase.from('bookings').select('*, room:rooms(room_number, room_type)').eq('check_out_date', today).in('status', ['confirmed', 'checked_in']),
+      supabase.from('bookings').select('id, room_id').eq('status', 'checked_in'),
+      supabase.from('rooms').select('id, room_number, room_type, cleaning_status').eq('cleaning_status', 'dirty').eq('is_active', true),
+      supabase.from('maintenance_tickets').select('id, title, priority, status, room:rooms(room_number)').eq('status', 'open').order('created_at', { ascending: false }),
+      supabase.from('payments').select('amount').eq('status', 'succeeded').gte('created_at', monthStart),
+      supabase.from('bookings').select('*, room:rooms(room_number, room_type)').order('created_at', { ascending: false }).limit(5),
+      supabase.from('payments').select('amount, created_at').eq('status', 'succeeded').gte('created_at', sevenDaysAgo),
+      supabase.from('bookings').select('check_in_date, check_out_date, room_id').in('status', ['confirmed', 'checked_in']).gte('check_out_date', today).lte('check_in_date', sevenDaysFromNow),
+      supabase.from('bookings').select('id, guest_first_name, guest_last_name, check_out_date, room:rooms(room_number)').eq('status', 'checked_in').lt('check_out_date', today),
+      supabase.from('bookings').select('check_in_date, check_out_date, total_amount').in('status', ['confirmed', 'checked_in', 'checked_out']).gte('check_in_date', monthStart),
+    ])
+
+    rooms = results[0].data
+    todayArrivals = results[1].data
+    todayDepartures = results[2].data
+    inHouseBookings = results[3].data
+    dirtyRooms = results[4].data
+    openTickets = results[5].data
+    monthlyPayments = results[6].data
+    recentBookings = results[7].data
+    revenueByDay = results[8].data
+    forecastBookings = results[9].data
+    overdueCheckouts = results[10].data
+    monthlyBookings = results[11].data
+  } catch (error) {
+    console.error('Error fetching dashboard statistics from Supabase:', error)
+  }
 
   const totalRooms = rooms?.length ?? 0
   const occupiedRoomIds = new Set((inHouseBookings ?? []).map((b: any) => b.room_id))

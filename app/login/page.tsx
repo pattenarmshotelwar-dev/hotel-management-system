@@ -32,9 +32,13 @@ export default function LoginPage() {
     }
 
     if (data.user) {
-      // Set active session marker for tab-close & inactivity tracking
-      sessionStorage.setItem('patten_hotel_session_active', 'true')
-      sessionStorage.setItem('patten_hotel_last_activity', Date.now().toString())
+      // Set active session marker for inactivity tracking
+      try {
+        localStorage.setItem('patten_hotel_last_activity', Date.now().toString())
+        sessionStorage.setItem('patten_hotel_last_activity', Date.now().toString())
+      } catch (e) {
+        // ignore
+      }
 
       // Determine role by email
       if (data.user.email === HOUSEKEEPING_EMAIL) {

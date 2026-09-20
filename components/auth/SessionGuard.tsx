@@ -7,41 +7,40 @@ import { toast } from 'sonner'
 
 // 15 minutes of inactivity timeout
 const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000
-const SESSION_ACTIVE_KEY = 'patten_hotel_session_active'
 const LAST_ACTIVITY_KEY = 'patten_hotel_last_activity'
 
 export default function SessionGuard() {
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
-  const lastActiveRef = useRef<number>(Date.now())
   const isLoggingOutRef = useRef<boolean>(false)
 
   const isPublicPage = pathname === '/login' || pathname.startsWith('/api/')
 
-  const handleLogout = useCallback(async (reason: 'inactivity' | 'tab_closed') => {
+  const handleLogout = useCallback(async () => {
     if (isLoggingOutRef.current) return
     isLoggingOutRef.current = true
 
-    sessionStorage.removeItem(SESSION_ACTIVE_KEY)
-    sessionStorage.removeItem(LAST_ACTIVITY_KEY)
-
-    await supabase.auth.signOut()
-
-    if (reason === 'inactivity') {
-      toast.error('Session expired due to inactivity. Please log in again.')
+    try {
+      localStorage.removeItem(LAST_ACTIVITY_KEY)
+      sessionStorage.removeItem(LAST_ACTIVITY_KEY)
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.error('Sign out error:', err)
     }
 
+    toast.error('Session expired due to 15 minutes of inactivity. Please log in again.')
     router.push('/login')
     router.refresh()
   }, [supabase, router])
 
   const updateActivity = useCallback(() => {
+    if (isLoggingOutRef.current) return
     const now = Date.now()
-    // Throttle timestamp writes
-    if (now - lastActiveRef.current > 2000) {
-      lastActiveRef.current = now
-      sessionStorage.setItem(LAST_ACTIVITY_KEY, now.toString())
+    try {
+      localStorage.setItem(LAST_ACTIVITY_KEY, now.toString())
+    } catch (e) {
+      // Ignore storage errors
     }
   }, [])
 
@@ -51,60 +50,67 @@ export default function SessionGuard() {
       return
     }
 
-    // Check if user is authenticated
-    const checkSessionState = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-
-      // Verify tab-level session persistence
-      // sessionStorage is isolated per tab and cleared on tab/window close
-      const isTabActive = sessionStorage.getItem(SESSION_ACTIVE_KEY)
-      if (!isTabActive) {
-        // Tab was closed and reopened, or brand new tab without login in this tab
-        await handleLogout('tab_closed')
-        return
-      }
-
-      // Check last activity timestamp
-      const storedLastActivity = sessionStorage.getItem(LAST_ACTIVITY_KEY)
-      if (storedLastActivity) {
-        const elapsed = Date.now() - parseInt(storedLastActivity, 10)
+    // Initialize or check activity on route mount
+    try {
+      const stored = localStorage.getItem(LAST_ACTIVITY_KEY)
+      const now = Date.now()
+      if (stored) {
+        const elapsed = now - parseInt(stored, 10)
         if (elapsed > INACTIVITY_TIMEOUT_MS) {
-          await handleLogout('inactivity')
+          handleLogout()
           return
         }
       }
-
-      // Mark tab as active and record current activity
-      sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true')
-      sessionStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString())
-      lastActiveRef.current = Date.now()
+      // Record current activity timestamp
+      localStorage.setItem(LAST_ACTIVITY_KEY, now.toString())
+    } catch (e) {
+      // Ignore storage errors
     }
 
-    checkSessionState()
-
-    // Activity event listeners
-    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
-    events.forEach(evt => window.addEventListener(evt, updateActivity, { passive: true }))
-
-    // Periodic inactivity checker
-    const interval = setInterval(() => {
-      const storedLastActivity = sessionStorage.getItem(LAST_ACTIVITY_KEY)
-      const lastActive = storedLastActivity ? parseInt(storedLastActivity, 10) : lastActiveRef.current
-      if (Date.now() - lastActive > INACTIVITY_TIMEOUT_MS) {
-        handleLogout('inactivity')
+    // Activity event listeners (throttled to every 3 seconds to avoid DOM overhead)
+    let lastThrottled = 0
+    const onUserActivity = () => {
+      const now = Date.now()
+      if (now - lastThrottled > 3000) {
+        lastThrottled = now
+        updateActivity()
       }
-    }, 10000)
+    }
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
+    events.forEach(evt => window.addEventListener(evt, onUserActivity, { passive: true }))
+
+    // Periodic inactivity checker every 15 seconds
+    const interval = setInterval(() => {
+      if (isLoggingOutRef.current) return
+      try {
+        const stored = localStorage.getItem(LAST_ACTIVITY_KEY)
+        if (stored) {
+          const elapsed = Date.now() - parseInt(stored, 10)
+          if (elapsed > INACTIVITY_TIMEOUT_MS) {
+            handleLogout()
+          }
+        }
+      } catch (e) {
+        // Ignore storage errors
+      }
+    }, 15000)
 
     // Visibility change checker (when returning to tab after being away)
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        const storedLastActivity = sessionStorage.getItem(LAST_ACTIVITY_KEY)
-        const lastActive = storedLastActivity ? parseInt(storedLastActivity, 10) : lastActiveRef.current
-        if (Date.now() - lastActive > INACTIVITY_TIMEOUT_MS) {
-          handleLogout('inactivity')
-        } else {
-          updateActivity()
+      if (document.visibilityState === 'visible' && !isLoggingOutRef.current) {
+        try {
+          const stored = localStorage.getItem(LAST_ACTIVITY_KEY)
+          if (stored) {
+            const elapsed = Date.now() - parseInt(stored, 10)
+            if (elapsed > INACTIVITY_TIMEOUT_MS) {
+              handleLogout()
+            } else {
+              updateActivity()
+            }
+          }
+        } catch (e) {
+          // Ignore storage errors
         }
       }
     }
@@ -112,11 +118,11 @@ export default function SessionGuard() {
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
-      events.forEach(evt => window.removeEventListener(evt, updateActivity))
+      events.forEach(evt => window.removeEventListener(evt, onUserActivity))
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       clearInterval(interval)
     }
-  }, [isPublicPage, handleLogout, updateActivity, supabase.auth])
+  }, [isPublicPage, handleLogout, updateActivity])
 
   return null
 }

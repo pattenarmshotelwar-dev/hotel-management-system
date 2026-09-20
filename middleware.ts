@@ -34,14 +34,26 @@ export async function middleware(request: NextRequest) {
     pathname.match(/\.(jpg|jpeg|png|gif|svg|webp|ico|pdf|txt)$/i)
   ) {
     if (user && pathname === '/login') {
-      return NextResponse.redirect(new URL('/admin', request.url))
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin'
+      const redirectResponse = NextResponse.redirect(url)
+      supabaseResponse.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
+      })
+      return redirectResponse
     }
     return supabaseResponse
   }
 
   // Protect all dashboard routes
   if (!user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    const redirectResponse = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
+    })
+    return redirectResponse
   }
 
   return supabaseResponse
