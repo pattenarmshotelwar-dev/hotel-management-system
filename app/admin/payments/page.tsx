@@ -90,11 +90,16 @@ export default function PaymentsPage() {
   }
 
   const handleSaveEdit = async (paymentId: string) => {
+    const numAmount = parseFloat(editAmount)
+    if (isNaN(numAmount) || numAmount <= 0) {
+      toast.error('Please enter a valid positive amount')
+      return
+    }
     const { error } = await supabase
       .from('payments')
       .update({
         notes: editNotes || null,
-        amount: parseFloat(editAmount),
+        amount: numAmount,
         status: editStatus as any,
       })
       .eq('id', paymentId)

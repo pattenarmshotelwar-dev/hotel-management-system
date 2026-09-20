@@ -380,7 +380,7 @@ export default function SettingsPage() {
                                   type="number"
                                   step="0.01"
                                   defaultValue={room.base_price}
-                                  onChange={e => handleEdit(room.id, 'base_price', parseFloat(e.target.value))}
+                                  onChange={e => handleEdit(room.id, 'base_price', parseFloat(e.target.value) || 0)}
                                   className="w-20 px-2 py-1 border border-slate-200 rounded-lg font-bold text-slate-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                                 />
                               </div>

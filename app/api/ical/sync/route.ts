@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import nodeIcal from 'node-ical'
 import { format } from 'date-fns'
+import { generateBookingReference } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   const supabase: any = await createAdminClient()
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
           .select('id, total_amount')
           .eq('room_id', room.id)
           .eq('ical_uid', uid)
-          .single()
+          .maybeSingle()
 
         if (existing) {
           // Update existing, ensuring non-zero total if currently 0
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
         } else {
           // Insert new booking with calculated total amount
           await supabase.from('bookings').insert({
+            booking_reference: generateBookingReference(),
             room_id: room.id,
             guest_first_name: guestFirstName,
             guest_last_name: guestLastName,

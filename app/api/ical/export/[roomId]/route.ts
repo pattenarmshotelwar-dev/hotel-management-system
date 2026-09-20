@@ -32,6 +32,7 @@ export async function GET(
       uid: booking.id,
       start: new Date(booking.check_in_date),
       end: new Date(booking.check_out_date),
+      allDay: true,
       summary: booking.is_maintenance_block
         ? `BLOCKED: ${booking.maintenance_reason ?? 'Maintenance'}`
         : `${booking.guest_first_name} ${booking.guest_last_name}`,

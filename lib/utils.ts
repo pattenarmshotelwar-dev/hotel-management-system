@@ -7,25 +7,51 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency = 'GBP'): string {
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency,
-  }).format(amount)
+export function formatCurrency(amount: number | string | null | undefined, currency = 'GBP'): string {
+  const num = Number(amount)
+  const safeAmount = isNaN(num) ? 0 : num
+  try {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency,
+    }).format(safeAmount)
+  } catch {
+    return `£${safeAmount.toFixed(2)}`
+  }
 }
 
-export function formatDate(date: string | Date, fmt = 'dd MMM yyyy'): string {
-  const d = typeof date === 'string' ? parseISO(date) : date
-  return format(d, fmt)
+export function formatDate(date: string | Date | null | undefined, fmt = 'dd MMM yyyy'): string {
+  if (!date) return '—'
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date
+    if (!d || isNaN(d.getTime())) return '—'
+    return format(d, fmt)
+  } catch {
+    return '—'
+  }
 }
 
-export function formatDateTime(date: string | Date): string {
-  const d = typeof date === 'string' ? parseISO(date) : date
-  return format(d, 'dd MMM yyyy, HH:mm')
+export function formatDateTime(date: string | Date | null | undefined): string {
+  if (!date) return '—'
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date
+    if (!d || isNaN(d.getTime())) return '—'
+    return format(d, 'dd MMM yyyy, HH:mm')
+  } catch {
+    return '—'
+  }
 }
 
 export function nightCount(checkIn: string, checkOut: string): number {
-  return differenceInDays(parseISO(checkOut), parseISO(checkIn))
+  try {
+    if (!checkIn || !checkOut) return 1
+    const dIn = parseISO(checkIn)
+    const dOut = parseISO(checkOut)
+    if (isNaN(dIn.getTime()) || isNaN(dOut.getTime())) return 1
+    return Math.max(1, differenceInDays(dOut, dIn))
+  } catch {
+    return 1
+  }
 }
 
 export function getRoomTypeLabel(type: RoomType): string {
@@ -182,6 +208,16 @@ export function generateBookingReference(): string {
   return result
 }
 
+export function formatWhatsAppPhone(phone: string = ''): string {
+  let digits = phone.replace(/[^0-9]/g, '')
+  if (digits.startsWith('07') && digits.length === 11) {
+    digits = '44' + digits.slice(1)
+  } else if (digits.startsWith('00')) {
+    digits = digits.slice(2)
+  }
+  return digits
+}
+
 export function sendCleanerWhatsAppMessage({
   phone = '',
   roomNumber,
@@ -197,7 +233,7 @@ export function sendCleanerWhatsAppMessage({
   priority?: 'Normal' | 'Urgent (Arrival Today)' | 'Guest Request'
   notes?: string
 }) {
-  const cleanPhone = phone.replace(/[^0-9]/g, '')
+  const cleanPhone = formatWhatsAppPhone(phone)
   const text = encodeURIComponent(
     `🏨 *Patten Arms Hotel — Housekeeping Alert*\n\n` +
     `🧹 *Room:* Room ${roomNumber} (Floor ${floor} — ${roomType})\n` +
@@ -237,7 +273,7 @@ export function sendGuestWhatsAppMessage({
   phone?: string
   text: string
 }) {
-  const cleanPhone = phone.replace(/[^0-9]/g, '')
+  const cleanPhone = formatWhatsAppPhone(phone)
   const encodedText = encodeURIComponent(text)
   const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodedText}` : `https://wa.me/?text=${encodedText}`
   if (typeof window !== 'undefined') {

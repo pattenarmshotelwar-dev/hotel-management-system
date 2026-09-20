@@ -61,10 +61,15 @@ export default function BookingDetailModal({ booking, onClose, onUpdated }: Prop
   }
 
   const handleRecordPayment = async () => {
+    const numAmount = parseFloat(paymentForm.amount)
+    if (isNaN(numAmount) || numAmount <= 0) {
+      toast.error('Please enter a valid positive payment amount')
+      return
+    }
     setLoading(true)
     const { error } = await supabase.from('payments').insert({
       booking_id: booking.id,
-      amount: parseFloat(paymentForm.amount),
+      amount: numAmount,
       currency: 'GBP',
       method: paymentForm.method as any,
       status: 'succeeded',
