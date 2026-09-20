@@ -198,14 +198,14 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <div className="flex items-center justify-center gap-2 text-slate-500 text-xs mt-6 opacity-75 hover:opacity-100 transition-opacity">
+        <div className="flex items-center justify-center gap-2.5 text-slate-400 text-xs mt-6 opacity-85 hover:opacity-100 transition-opacity">
           <span>Created by</span>
           <Image
             src="/uv-digital-logo.png"
             alt="UV Digital"
-            width={72}
-            height={22}
-            className="h-5 w-auto object-contain rounded-sm inline-block"
+            width={50}
+            height={50}
+            className="h-[50px] w-[50px] object-contain rounded-md inline-block shadow-sm"
             unoptimized
           />
         </div>
