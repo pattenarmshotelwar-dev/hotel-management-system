@@ -4,6 +4,8 @@ import nodeIcal from 'node-ical'
 import { format } from 'date-fns'
 import { generateBookingReference } from '@/lib/utils'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   // Authorization check: either valid cron secret or authenticated session
   const authHeader = request.headers.get('authorization')

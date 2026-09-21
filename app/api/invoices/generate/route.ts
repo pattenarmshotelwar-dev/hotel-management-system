@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import jsPDF from 'jspdf'
 import { format } from 'date-fns'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const bookingId = searchParams.get('bookingId')
