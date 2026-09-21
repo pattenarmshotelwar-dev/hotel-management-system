@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/api/ical/export') ||
-    pathname.startsWith('/api/auth/') ||
+    pathname.startsWith('/api/payments/webhook') ||
     pathname.match(/\.(jpg|jpeg|png|gif|svg|webp|ico|pdf|txt)$/i)
   ) {
     if (user && pathname === '/login') {
@@ -53,8 +53,13 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Protect all dashboard routes
+  // Protect all internal routes and APIs
   if (!user) {
+    // Return standard JSON 401 for unauthorized API requests
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized: Session authentication required' }, { status: 401 })
+    }
+
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     const redirectResponse = NextResponse.redirect(url)

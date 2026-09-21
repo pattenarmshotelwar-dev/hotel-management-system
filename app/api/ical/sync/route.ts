@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import nodeIcal from 'node-ical'
 import { format } from 'date-fns'
 import { generateBookingReference } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
+  // Authorization check: either valid cron secret or authenticated session
+  const authHeader = request.headers.get('authorization')
+  const cronSecret = process.env.CRON_SECRET
+
+  let isAuthorized = false
+  if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+    isAuthorized = true
+  } else {
+    const userSupabase = await createClient()
+    const { data: { user } } = await userSupabase.auth.getUser()
+    if (user) isAuthorized = true
+  }
+
+  if (!isAuthorized) {
+    return NextResponse.json({ error: 'Unauthorized: Valid session or CRON_SECRET required' }, { status: 401 })
+  }
+
   const supabase: any = await createAdminClient()
 
   // Get all rooms with iCal import URLs

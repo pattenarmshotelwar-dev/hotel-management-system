@@ -150,6 +150,9 @@ CREATE INDEX idx_bookings_room_dates ON bookings(room_id, check_in_date, check_o
 CREATE INDEX idx_bookings_status ON bookings(status);
 CREATE INDEX idx_bookings_source ON bookings(source);
 CREATE INDEX idx_bookings_dates ON bookings(check_in_date, check_out_date);
+CREATE INDEX idx_bookings_ref ON bookings(booking_reference);
+CREATE INDEX idx_bookings_guest_name ON bookings(guest_last_name, guest_first_name);
+CREATE INDEX idx_bookings_ical_uid ON bookings(ical_uid);
 
 -- =============================================
 -- PAYMENTS TABLE
@@ -177,6 +180,8 @@ CREATE TABLE payments (
 
 CREATE INDEX idx_payments_booking ON payments(booking_id);
 CREATE INDEX idx_payments_status ON payments(status);
+CREATE INDEX idx_payments_created_at ON payments(created_at DESC);
+CREATE INDEX idx_payments_ref ON payments(reference_number);
 
 -- =============================================
 -- CLEANING LOGS TABLE

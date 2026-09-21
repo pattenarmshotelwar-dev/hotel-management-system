@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
+  const userSupabase = await createClient()
+  const { data: { user } } = await userSupabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const supabase: any = await createAdminClient()
 
   // Fetch all active rooms
@@ -42,6 +48,17 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const userSupabase = await createClient()
+  const { data: { user } } = await userSupabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const userEmail = user.email?.toLowerCase() || ''
+  if (userEmail.startsWith('frontdesk') || userEmail.startsWith('housekeeping')) {
+    return NextResponse.json({ error: 'Forbidden: Management permissions required' }, { status: 403 })
+  }
+
   const supabase: any = await createAdminClient()
   const body = await request.json()
   const { channelMarkupPercent = 15, updateBasePrices = false, rates = {} } = body

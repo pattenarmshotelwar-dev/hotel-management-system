@@ -1,30 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder')
-  const { bookingId, amount, paymentMethodId, guestEmail, description } = await request.json()
-
-  const supabase: any = await createAdminClient()
-
   try {
+    const userSupabase = await createClient()
+    const { data: { user } } = await userSupabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Staff login required' }, { status: 401 })
+    }
+
+    const { bookingId, amount, paymentMethodId, guestEmail, description } = await request.json()
+
+    const numAmount = parseFloat(amount)
+    if (!bookingId || isNaN(numAmount) || numAmount <= 0 || !paymentMethodId) {
+      return NextResponse.json({ success: false, error: 'Valid bookingId, paymentMethodId, and positive amount are required' }, { status: 400 })
+    }
+
+    const stripeKey = process.env.STRIPE_SECRET_KEY
+    if (!stripeKey || stripeKey === 'sk_test_placeholder') {
+      return NextResponse.json({ success: false, error: 'Stripe is not configured in this environment' }, { status: 503 })
+    }
+
+    const stripe = new Stripe(stripeKey)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hotel-management-system-one-lovat.vercel.app'
+    const supabase: any = await createAdminClient()
+
     // Create payment intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
+      amount: Math.round(numAmount * 100),
       currency: 'gbp',
       payment_method: paymentMethodId,
       confirm: true,
       receipt_email: guestEmail ?? undefined,
       description: description ?? `Hotel booking ${bookingId}`,
       metadata: { bookingId },
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/admin/bookings`,
+      return_url: `${appUrl}/admin/bookings`,
     })
 
     // Record payment
     await supabase.from('payments').insert({
       booking_id: bookingId,
-      amount,
+      amount: numAmount,
       currency: 'GBP',
       method: 'stripe_card',
       status: paymentIntent.status === 'succeeded' ? 'succeeded' : 'pending',

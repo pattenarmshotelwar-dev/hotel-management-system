@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
+    const userSupabase = await createClient()
+    const { data: { user } } = await userSupabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized: Staff login required' }, { status: 401 })
+    }
+
     const { bookingId, amount, guestName, guestEmail, description } = await request.json()
 
     const numAmount = parseFloat(amount)

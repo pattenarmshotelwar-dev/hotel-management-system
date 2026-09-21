@@ -167,14 +167,15 @@ function BookingsContent() {
       }
 
       // 2. Search filter
+      const searchLower = search.toLowerCase()
       const matchSearch =
         search === '' ||
-        b.guest_first_name.toLowerCase().includes(search.toLowerCase()) ||
-        b.guest_last_name.toLowerCase().includes(search.toLowerCase()) ||
-        b.booking_reference.toLowerCase().includes(search.toLowerCase()) ||
-        (b.guest_email ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (b.guest_first_name ?? '').toLowerCase().includes(searchLower) ||
+        (b.guest_last_name ?? '').toLowerCase().includes(searchLower) ||
+        (b.booking_reference ?? '').toLowerCase().includes(searchLower) ||
+        (b.guest_email ?? '').toLowerCase().includes(searchLower) ||
         (b.guest_phone ?? '').includes(search) ||
-        (b.booking_com_reference ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (b.booking_com_reference ?? '').toLowerCase().includes(searchLower) ||
         ((b as any).room?.room_number ?? '').toString().includes(search)
 
       if (!matchSearch) return false

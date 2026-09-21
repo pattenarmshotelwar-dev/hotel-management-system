@@ -413,9 +413,9 @@ export default function FrontDeskPage() {
     const q = searchQuery.toLowerCase()
     return arrivals.filter(
       b =>
-        b.guest_first_name.toLowerCase().includes(q) ||
-        b.guest_last_name.toLowerCase().includes(q) ||
-        b.booking_reference.toLowerCase().includes(q) ||
+        (b.guest_first_name ?? '').toLowerCase().includes(q) ||
+        (b.guest_last_name ?? '').toLowerCase().includes(q) ||
+        (b.booking_reference ?? '').toLowerCase().includes(q) ||
         ((b as any).room?.room_number ?? '').toString().includes(q)
     )
   }, [arrivals, searchQuery])
@@ -426,9 +426,9 @@ export default function FrontDeskPage() {
     const q = searchQuery.toLowerCase()
     return inHouse.filter(
       b =>
-        b.guest_first_name.toLowerCase().includes(q) ||
-        b.guest_last_name.toLowerCase().includes(q) ||
-        b.booking_reference.toLowerCase().includes(q) ||
+        (b.guest_first_name ?? '').toLowerCase().includes(q) ||
+        (b.guest_last_name ?? '').toLowerCase().includes(q) ||
+        (b.booking_reference ?? '').toLowerCase().includes(q) ||
         ((b as any).room?.room_number ?? '').toString().includes(q)
     )
   }, [inHouse, searchQuery])
@@ -439,9 +439,9 @@ export default function FrontDeskPage() {
     const q = searchQuery.toLowerCase()
     return departures.filter(
       b =>
-        b.guest_first_name.toLowerCase().includes(q) ||
-        b.guest_last_name.toLowerCase().includes(q) ||
-        b.booking_reference.toLowerCase().includes(q) ||
+        (b.guest_first_name ?? '').toLowerCase().includes(q) ||
+        (b.guest_last_name ?? '').toLowerCase().includes(q) ||
+        (b.booking_reference ?? '').toLowerCase().includes(q) ||
         ((b as any).room?.room_number ?? '').toString().includes(q)
     )
   }, [departures, searchQuery])

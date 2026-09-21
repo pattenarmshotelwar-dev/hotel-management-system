@@ -1,12 +1,41 @@
 import { NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization')
+    const setupSecretHeader = request.headers.get('x-setup-secret')
+    const envSecret = process.env.ADMIN_SETUP_SECRET || process.env.CRON_SECRET
+
+    // Check if caller has valid secret token or is authenticated management session
+    let isAuthorized = false
+    if (envSecret && (setupSecretHeader === envSecret || authHeader === `Bearer ${envSecret}`)) {
+      isAuthorized = true
+    } else {
+      const serverSupabase = await createClient()
+      const { data: { user } } = await serverSupabase.auth.getUser()
+      const userEmail = user?.email?.toLowerCase() || ''
+      // Only management/admin users can trigger user setup
+      if (user && !userEmail.startsWith('frontdesk') && !userEmail.startsWith('housekeeping')) {
+        isAuthorized = true
+      }
+    }
+
+    if (!isAuthorized) {
+      return NextResponse.json({ error: 'Unauthorized access to user provisioning' }, { status: 403 })
+    }
+
     const { email, password } = await request.json()
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
+    }
+
+    // Safety constraint: This endpoint can only provision the front desk account, not arbitrary admin accounts
+    const targetEmail = email.toLowerCase().trim()
+    if (targetEmail !== 'frontdesk@patternarmswarhotel.co.uk') {
+      return NextResponse.json({ error: 'This endpoint can only provision the front desk service account' }, { status: 400 })
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
