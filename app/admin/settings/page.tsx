@@ -971,6 +971,8 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          )}
+        </>
       )}
 
       {/* Add New Room Modal */}
