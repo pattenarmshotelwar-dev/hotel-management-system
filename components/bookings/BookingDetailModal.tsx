@@ -378,10 +378,11 @@ export default function BookingDetailModal({ booking, onClose, onUpdated }: Prop
                   Stripe Payment Link
                 </button>
                 <button
-                  onClick={() => setShowInvoice(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-800 border border-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-200 transition"
+                  onClick={() => window.open(`/api/invoices/generate?bookingId=${booking.id}`, '_blank', 'noopener,noreferrer')}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-800 border border-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-200 transition cursor-pointer"
+                  title="Open Official Tax Invoice PDF in new tab"
                 >
-                  <Printer className="w-3.5 h-3.5 text-blue-600" /> Official Invoice
+                  <Printer className="w-3.5 h-3.5 text-blue-600" /> Official Invoice (PDF)
                 </button>
                 <button
                   onClick={() => setShowWhatsAppModal(true)}

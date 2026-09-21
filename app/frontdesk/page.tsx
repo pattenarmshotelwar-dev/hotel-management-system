@@ -901,14 +901,14 @@ export default function FrontDeskPage() {
                           )}
                         </div>
 
-                        {/* Official Invoice */}
+                        {/* Official Invoice (PDF Viewer) */}
                         <button
-                          onClick={() => setInvoiceBooking(b)}
-                          className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-medium flex items-center gap-1.5 transition"
-                          title="Generate official VAT invoice"
+                          onClick={() => window.open(`/api/invoices/generate?bookingId=${b.id}`, '_blank', 'noopener,noreferrer')}
+                          className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
+                          title="Open official VAT invoice PDF in new tab"
                         >
                           <FileText className="w-3.5 h-3.5" />
-                          <span>Invoice</span>
+                          <span>Invoice (PDF)</span>
                         </button>
 
                         {/* 1-Click Check Out */}
@@ -992,13 +992,14 @@ export default function FrontDeskPage() {
                           )}
                         </div>
 
-                        {/* Invoice */}
+                        {/* Invoice (PDF Viewer) */}
                         <button
-                          onClick={() => setInvoiceBooking(b)}
-                          className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium flex items-center gap-1.5 transition"
+                          onClick={() => window.open(`/api/invoices/generate?bookingId=${b.id}`, '_blank', 'noopener,noreferrer')}
+                          className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
+                          title="Open official VAT invoice PDF in new tab"
                         >
                           <FileText className="w-3.5 h-3.5" />
-                          <span>Invoice</span>
+                          <span>Invoice (PDF)</span>
                         </button>
 
                         {!isCheckedOut && (

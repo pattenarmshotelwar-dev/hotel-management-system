@@ -592,11 +592,11 @@ function BookingsContent() {
                       {/* Actions */}
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {/* Official Tax Invoice */}
+                          {/* Official Tax Invoice (PDF Viewer) */}
                           <button
-                            onClick={() => setInvoiceBooking(booking)}
+                            onClick={() => window.open(`/api/invoices/generate?bookingId=${booking.id}`, '_blank', 'noopener,noreferrer')}
                             className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition"
-                            title="Official Tax Invoice (PAH Template)"
+                            title="Open Official Tax Invoice PDF in new tab"
                           >
                             <FileText className="w-4 h-4 text-blue-600" />
                           </button>

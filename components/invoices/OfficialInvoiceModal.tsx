@@ -41,7 +41,11 @@ export default function OfficialInvoiceModal({ booking, payments = [], onClose }
   }, [])
 
   const handlePrint = () => {
-    window.print()
+    if (booking?.id) {
+      window.open(`/api/invoices/generate?bookingId=${booking.id}`, '_blank', 'noopener,noreferrer')
+    } else {
+      window.print()
+    }
   }
 
   // Financial calculations

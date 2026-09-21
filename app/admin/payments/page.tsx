@@ -466,12 +466,12 @@ export default function PaymentsPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {/* Official Tax Invoice */}
+                          {/* Official Tax Invoice (PDF Viewer) */}
                           {b && (
                             <button
-                              onClick={() => setInvoiceBooking(b)}
-                              className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition"
-                              title="Official Tax Invoice"
+                              onClick={() => window.open(`/api/invoices/generate?bookingId=${b.id}`, '_blank', 'noopener,noreferrer')}
+                              className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                              title="Open Official Tax Invoice PDF in new tab"
                             >
                               <FileText className="w-3.5 h-3.5" />
                             </button>
