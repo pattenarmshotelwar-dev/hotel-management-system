@@ -72,18 +72,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         {/* Logo */}
-        <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-700">
-          <Image
-            src="/logo.jpg"
-            alt="The Patten Arms Hotel"
-            width={140}
-            height={60}
-            className="h-10 w-auto object-contain"
-            priority
-            unoptimized
-          />
+        <div className="flex items-center justify-between gap-2 px-3.5 py-3.5 border-b border-slate-700">
+          <div className="flex items-center gap-2 min-w-0">
+            <Image
+              src="/logo.jpg"
+              alt="The Patten Arms Hotel"
+              width={110}
+              height={45}
+              className="h-9 w-auto object-contain rounded shrink-0"
+              priority
+              unoptimized
+            />
+            <div className="flex items-center gap-1.5 text-slate-400 text-[10px] opacity-80 hover:opacity-100 transition-opacity shrink-0">
+              <span className="leading-tight text-slate-400">Created by</span>
+              <Image
+                src="/uv-digital-logo.png"
+                alt="UV Digital"
+                width={26}
+                height={26}
+                className="h-[26px] w-[26px] object-contain rounded shadow-xs"
+                unoptimized
+              />
+            </div>
+          </div>
           <button
-            className="ml-auto lg:hidden text-slate-400 hover:text-white"
+            className="ml-auto lg:hidden text-slate-400 hover:text-white shrink-0 p-1"
             onClick={() => setSidebarOpen(false)}
           >
             <X className="w-5 h-5" />
