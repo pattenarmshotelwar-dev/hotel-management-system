@@ -32,6 +32,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/login') ||
     pathname.startsWith('/api/ical/export') ||
     pathname.startsWith('/api/payments/webhook') ||
+    pathname.startsWith('/api/invoices/generate') ||
     pathname.match(/\.(jpg|jpeg|png|gif|svg|webp|ico|pdf|txt)$/i)
   ) {
     if (user && pathname === '/login') {
