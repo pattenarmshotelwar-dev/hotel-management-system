@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import jsPDF from 'jspdf'
 import { format } from 'date-fns'
+import fs from 'fs'
+import path from 'path'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,11 +67,25 @@ export async function GET(request: NextRequest) {
   const addonsTotalSum = parsedAddons.reduce((sum, a) => sum + a.total, 0)
   const accommodationGross = Math.max(0, grossTotal - addonsTotalSum)
   const roomRatePerNight = nights > 0 ? (accommodationGross / nights) : accommodationGross
-  const roomNumber = room?.room_number ?? '—'
+  const roomNumber = room?.room_number ?? 'Assigned'
   const roomTypeLabel = (room?.room_type ?? 'Standard').replace(/_/g, ' ')
 
   // -------------------------------------------------------------
-  // Generate Professional PDF Document
+  // Read Logo Base64
+  // -------------------------------------------------------------
+  let logoDataUri: string | null = null
+  try {
+    const logoPath = path.join(process.cwd(), 'public', 'invoice-logo.png')
+    if (fs.existsSync(logoPath)) {
+      const buffer = fs.readFileSync(logoPath)
+      logoDataUri = `data:image/png;base64,${buffer.toString('base64')}`
+    }
+  } catch (e) {
+    // fallback gracefully
+  }
+
+  // -------------------------------------------------------------
+  // Generate Exact Official Invoice PDF Document (A4 White Paper)
   // -------------------------------------------------------------
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -78,139 +94,199 @@ export async function GET(request: NextRequest) {
   })
 
   const pageWidth = doc.internal.pageSize.getWidth() // 210mm
-  const margin = 16
-  const contentWidth = pageWidth - (margin * 2)
+  const margin = 15
+  const contentWidth = pageWidth - (margin * 2) // 180mm
+  const colWidth = (contentWidth - 6) / 2 // 87mm
+  const col2X = margin + colWidth + 6 // 108mm
 
-  // 1. Top Header Banner
-  doc.setFillColor(15, 23, 42) // slate-900
-  doc.rect(0, 0, pageWidth, 42, 'F')
+  // --- 1. HEADER ROW (Logo on Left, INVOICE on Right) ---
+  if (logoDataUri) {
+    try {
+      // 52mm wide by 28.5mm high (matches 1.821 aspect ratio)
+      doc.addImage(logoDataUri, 'PNG', margin, 12, 52, 28.5)
+    } catch (e) {
+      // fallback
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(16)
+      doc.setTextColor(15, 23, 42)
+      doc.text('THE PATTEN ARMS HOTEL', margin, 20)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(100, 116, 139)
+      doc.text('Parker Street, Warrington WA1 1LS', margin, 26)
+    }
+  } else {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(16)
+    doc.setTextColor(15, 23, 42)
+    doc.text('THE PATTEN ARMS HOTEL', margin, 20)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(100, 116, 139)
+    doc.text('Parker Street, Warrington WA1 1LS', margin, 26)
+  }
 
-  // Hotel Name & Details (Left)
-  doc.setTextColor(255, 255, 255)
+  // Right Side: INVOICE header & meta
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(16)
-  doc.text('THE PATTEN ARMS HOTEL', margin, 15)
+  doc.setFontSize(22)
+  doc.setTextColor(15, 23, 42) // slate-900
+  doc.text('INVOICE', pageWidth - margin, 20, { align: 'right' })
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
-  doc.setTextColor(203, 213, 225) // slate-300
-  doc.text('Parker Street, Warrington, Cheshire, WA1 1LS', margin, 22)
-  doc.text('Tel: 01925 636602   |   Email: info@pattenarms.co.uk', margin, 27)
-  doc.text('Trading as Rumiscapes Ltd   |   Company No. 16117921', margin, 32)
-
-  // Invoice Title & Meta (Right)
-  doc.setTextColor(255, 255, 255)
+  doc.setTextColor(100, 116, 139) // slate-500
+  doc.text('Invoice No:', pageWidth - margin - 35, 28, { align: 'right' })
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(16)
-  doc.text('TAX INVOICE', pageWidth - margin, 15, { align: 'right' })
+  doc.setTextColor(15, 23, 42)
+  doc.text(`PAH-${booking.booking_reference}`, pageWidth - margin, 28, { align: 'right' })
 
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8.5)
-  doc.setTextColor(203, 213, 225)
-  doc.text(`Invoice No: PAH-${booking.booking_reference}`, pageWidth - margin, 22, { align: 'right' })
-  doc.text(`Date: ${format(new Date(), 'dd/MM/yyyy')}`, pageWidth - margin, 27, { align: 'right' })
-  doc.text(`Folio: ${(booking.booking_reference || '').replace(/[^0-9]/g, '') || '00104'}`, pageWidth - margin, 32, { align: 'right' })
+  doc.setTextColor(100, 116, 139)
+  doc.text('Invoice Date:', pageWidth - margin - 35, 34, { align: 'right' })
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(15, 23, 42)
+  doc.text(format(new Date(), 'dd/MM/yyyy'), pageWidth - margin, 34, { align: 'right' })
 
-  // 2. Two Information Cards (Guest Details & Stay Details)
-  const cardY = 48
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 116, 139)
+  doc.text('Folio No:', pageWidth - margin - 35, 40, { align: 'right' })
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(30, 41, 59)
+  const folioNum = (booking.booking_reference || '').replace(/[^0-9]/g, '') || '000104'
+  doc.text(folioNum, pageWidth - margin, 40, { align: 'right' })
+
+  // Header Divider Line
+  doc.setDrawColor(203, 213, 225) // slate-300
+  doc.setLineWidth(0.3)
+  doc.line(margin, 46, pageWidth - margin, 46)
+
+  // --- 2. DETAILS 2-COLUMN GRID (GUEST DETAILS & STAY DETAILS) ---
+  const cardY = 51
   const cardHeight = 36
-  const colWidth = (contentWidth - 6) / 2
 
-  // Card 1: Guest Details
-  doc.setFillColor(248, 250, 252) // slate-50
-  doc.setDrawColor(226, 232, 240) // slate-200
+  // Card 1: GUEST DETAILS
+  doc.setFillColor(248, 250, 252) // bg-slate-50/50
+  doc.setDrawColor(226, 232, 240) // border-slate-200
   doc.roundedRect(margin, cardY, colWidth, cardHeight, 2, 2, 'FD')
 
-  doc.setTextColor(71, 85, 105) // slate-600
+  doc.setTextColor(100, 116, 139) // text-slate-500
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8.5)
-  doc.text('GUEST DETAILS', margin + 4, cardY + 7)
+  doc.setFontSize(8)
+  doc.text('GUEST DETAILS', margin + 4, cardY + 6.5)
 
   doc.setDrawColor(226, 232, 240)
-  doc.line(margin + 4, cardY + 9, margin + colWidth - 4, cardY + 9)
+  doc.line(margin + 4, cardY + 8.5, margin + colWidth - 4, cardY + 8.5)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(100, 116, 139)
-  doc.text('Guest Name:', margin + 4, cardY + 15)
+  doc.text('Guest Name:', margin + 4, cardY + 14.5)
   doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8.5)
   doc.setTextColor(15, 23, 42)
-  doc.text(`${booking.guest_first_name} ${booking.guest_last_name}`, margin + 26, cardY + 15)
+  doc.text(`${booking.guest_first_name} ${booking.guest_last_name}`, margin + 24, cardY + 14.5)
 
   doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
   doc.setTextColor(100, 116, 139)
-  doc.text('Address:', margin + 4, cardY + 21)
+  doc.text('Address:', margin + 4, cardY + 20.5)
   doc.setTextColor(30, 41, 59)
-  doc.text(booking.guest_country || 'United Kingdom', margin + 26, cardY + 21)
+  doc.text(booking.guest_country || 'United Kingdom', margin + 24, cardY + 20.5)
 
   doc.setTextColor(100, 116, 139)
-  doc.text('Email:', margin + 4, cardY + 27)
+  doc.text('Email:', margin + 4, cardY + 26.5)
   doc.setTextColor(30, 41, 59)
-  doc.text(booking.guest_email || '—', margin + 26, cardY + 27)
+  doc.text(booking.guest_email || '—', margin + 24, cardY + 26.5)
 
   doc.setTextColor(100, 116, 139)
-  doc.text('Phone:', margin + 4, cardY + 33)
+  doc.text('Phone:', margin + 4, cardY + 32.5)
   doc.setTextColor(30, 41, 59)
-  doc.text(booking.guest_phone || '—', margin + 26, cardY + 33)
+  doc.text(booking.guest_phone || '—', margin + 24, cardY + 32.5)
 
-  // Card 2: Stay Details
-  const col2X = margin + colWidth + 6
+  // Card 2: STAY DETAILS
   doc.setFillColor(248, 250, 252)
   doc.setDrawColor(226, 232, 240)
   doc.roundedRect(col2X, cardY, colWidth, cardHeight, 2, 2, 'FD')
 
-  doc.setTextColor(71, 85, 105)
+  doc.setTextColor(100, 116, 139)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8.5)
-  doc.text('STAY DETAILS', col2X + 4, cardY + 7)
+  doc.setFontSize(8)
+  doc.text('STAY DETAILS', col2X + 4, cardY + 6.5)
 
   doc.setDrawColor(226, 232, 240)
-  doc.line(col2X + 4, cardY + 9, col2X + colWidth - 4, cardY + 9)
+  doc.line(col2X + 4, cardY + 8.5, col2X + colWidth - 4, cardY + 8.5)
+
+  // Sub-grid 2 columns inside Stay Details
+  const stayCol2X = col2X + 44
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(100, 116, 139)
-  doc.text('Room:', col2X + 4, cardY + 15)
+  doc.text('Room Number:', col2X + 4, cardY + 14.5)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(15, 23, 42)
-  doc.text(`Room ${roomNumber} (${roomTypeLabel})`, col2X + 22, cardY + 15)
+  doc.text(`Room ${roomNumber}`, col2X + 26, cardY + 14.5)
 
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(100, 116, 139)
-  doc.text('Check In:', col2X + 4, cardY + 21)
-  doc.setTextColor(30, 41, 59)
-  doc.text(format(ciDate, 'dd/MM/yyyy'), col2X + 22, cardY + 21)
-
-  doc.setTextColor(100, 116, 139)
-  doc.text('Check Out:', col2X + 4, cardY + 27)
-  doc.setTextColor(30, 41, 59)
-  doc.text(format(coDate, 'dd/MM/yyyy'), col2X + 22, cardY + 27)
-
-  doc.setTextColor(100, 116, 139)
-  doc.text('Duration:', col2X + 4, cardY + 33)
+  doc.text('Room Type:', stayCol2X, cardY + 14.5)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(15, 23, 42)
-  doc.text(`${nights} night${nights > 1 ? 's' : ''} (${booking.adults || 1} Adult${(booking.adults || 1) > 1 ? 's' : ''}${(booking.children || 0) > 0 ? `, ${booking.children} Child` : ''})`, col2X + 22, cardY + 33)
+  doc.text(roomTypeLabel, stayCol2X + 18, cardY + 14.5)
 
-  // 3. Itemised Charges Table
-  const tableY = cardY + cardHeight + 8
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 116, 139)
+  doc.text('Check In:', col2X + 4, cardY + 23.5)
+  doc.setTextColor(30, 41, 59)
+  doc.text(format(ciDate, 'dd/MM/yyyy'), col2X + 26, cardY + 23.5)
 
-  // Table header bar
-  doc.setFillColor(241, 245, 249) // slate-100
+  doc.setTextColor(100, 116, 139)
+  doc.text('Check Out:', stayCol2X, cardY + 23.5)
+  doc.setTextColor(30, 41, 59)
+  doc.text(format(coDate, 'dd/MM/yyyy'), stayCol2X + 18, cardY + 23.5)
+
+  doc.setTextColor(100, 116, 139)
+  doc.text('No. of Nights:', col2X + 4, cardY + 32.5)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(15, 23, 42)
+  doc.text(`${nights}`, col2X + 26, cardY + 32.5)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 116, 139)
+  doc.text('No. of Guests:', stayCol2X, cardY + 32.5)
+  doc.setTextColor(30, 41, 59)
+  const guestsLabel = `${booking?.adults || 1} Adult${(booking?.adults || 1) > 1 ? 's' : ''}${(booking?.children || 0) > 0 ? `, ${booking.children} Child` : ''}`
+  doc.text(guestsLabel, stayCol2X + 20, cardY + 32.5)
+
+  // --- 3. ITEMISED CHARGES TABLE ---
+  const tableY = cardY + cardHeight + 6
+
+  // Section Header: ITEMISED CHARGES
+  doc.setFillColor(241, 245, 249) // bg-slate-100
   doc.setDrawColor(203, 213, 225)
-  doc.rect(margin, tableY, contentWidth, 7, 'FD')
+  doc.rect(margin, tableY, contentWidth, 6.5, 'FD')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(51, 65, 85) // text-slate-700
+  doc.text('ITEMISED CHARGES', margin + 4, tableY + 4.5)
+
+  // Table Column Header Bar
+  const thY = tableY + 6.5
+  doc.setFillColor(248, 250, 252) // bg-slate-50
+  doc.rect(margin, thY, contentWidth, 6, 'FD')
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(7.5)
-  doc.setTextColor(51, 65, 85)
-  doc.text('DATE', margin + 4, tableY + 4.8)
-  doc.text('DESCRIPTION', margin + 30, tableY + 4.8)
-  doc.text('QTY', margin + 115, tableY + 4.8, { align: 'center' })
-  doc.text('UNIT PRICE', margin + 145, tableY + 4.8, { align: 'right' })
-  doc.text('AMOUNT (GBP)', pageWidth - margin - 4, tableY + 4.8, { align: 'right' })
+  doc.setTextColor(100, 116, 139) // text-slate-500
+  doc.text('DATE', margin + 4, thY + 4.2)
+  doc.text('DESCRIPTION', margin + 30, thY + 4.2)
+  doc.text('QTY', margin + 115, thY + 4.2, { align: 'center' })
+  doc.text('UNIT PRICE', margin + 145, thY + 4.2, { align: 'right' })
+  doc.text('AMOUNT', pageWidth - margin - 4, thY + 4.2, { align: 'right' })
 
   // Row 1: Accommodation
-  let currentY = tableY + 7
+  let currentY = thY + 6
   const rowHeight = 7.5
 
   doc.setFillColor(255, 255, 255)
@@ -225,7 +301,7 @@ export async function GET(request: NextRequest) {
 
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(15, 23, 42)
-  doc.text(`Accommodation — Room ${roomNumber} (${roomTypeLabel})`, margin + 30, currentY + 5)
+  doc.text(`Accommodation — ${roomTypeLabel} (Room ${roomNumber})`, margin + 30, currentY + 5)
 
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(71, 85, 105)
@@ -264,23 +340,23 @@ export async function GET(request: NextRequest) {
     currentY += rowHeight
   }
 
-  // Outer border for charges table
+  // Outer border for itemised table
   doc.setDrawColor(203, 213, 225)
   doc.rect(margin, tableY, contentWidth, currentY - tableY, 'D')
 
-  // 4. Financial Totals & Payments Section
-  const totalsY = currentY + 6
+  // --- 4. PAYMENTS & DEPOSITS (Left) vs TOTALS (Right) ---
+  const totalsY = currentY + 5
   const blockHeight = 44
 
-  // Left Card: Payments Received List
-  doc.setFillColor(248, 250, 252)
+  // Left: PAYMENTS & DEPOSITS
+  doc.setFillColor(255, 255, 255)
   doc.setDrawColor(226, 232, 240)
   doc.roundedRect(margin, totalsY, colWidth, blockHeight, 2, 2, 'FD')
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
-  doc.setTextColor(71, 85, 105)
-  doc.text('PAYMENTS & SETTLEMENT', margin + 4, totalsY + 6.5)
+  doc.setTextColor(100, 116, 139)
+  doc.text('PAYMENTS & DEPOSITS', margin + 4, totalsY + 6.5)
 
   doc.setDrawColor(226, 232, 240)
   doc.line(margin + 4, totalsY + 8.5, margin + colWidth - 4, totalsY + 8.5)
@@ -289,13 +365,13 @@ export async function GET(request: NextRequest) {
     let pyY = totalsY + 14
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7.5)
-    for (const p of successfulPayments.slice(0, 4)) {
+    for (const p of successfulPayments.slice(0, 3)) {
       doc.setTextColor(71, 85, 105)
       const pMethod = String(p.method || 'Card').replace(/_/g, ' ')
       const pDate = format(new Date(p.created_at), 'dd/MM/yyyy')
       doc.text(`${pDate} — ${pMethod}`, margin + 4, pyY)
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(22, 101, 52) // emerald-800
+      doc.setTextColor(21, 128, 61) // text-green-700
       doc.text(`-£${Number(p.amount).toFixed(2)}`, margin + colWidth - 4, pyY, { align: 'right' })
       doc.setFont('helvetica', 'normal')
       pyY += 5.5
@@ -304,17 +380,25 @@ export async function GET(request: NextRequest) {
     doc.setFont('helvetica', 'italic')
     doc.setFontSize(7.5)
     doc.setTextColor(148, 163, 184)
-    doc.text('No recorded payments on file.', margin + 4, totalsY + 16)
+    doc.text('No payments recorded to date.', margin + 4, totalsY + 15)
   }
 
-  // Stamp / status note at bottom of left card
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(100, 116, 139)
-  doc.text('Thank you for choosing The Patten Arms Hotel.', margin + 4, totalsY + blockHeight - 4)
+  // Appreciation Note inside left box
+  doc.setDrawColor(241, 245, 249)
+  doc.line(margin + 4, totalsY + blockHeight - 11, margin + colWidth - 4, totalsY + blockHeight - 11)
 
-  // Right Card: Subtotals, VAT, Grand Total, Balance
-  doc.setFillColor(248, 250, 252)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.5)
+  doc.setTextColor(51, 65, 85)
+  doc.text('Thank you for staying with us.', margin + 4, totalsY + blockHeight - 6.5)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7)
+  doc.setTextColor(148, 163, 184)
+  doc.text('We hope to welcome you back soon.', margin + 4, totalsY + blockHeight - 2.5)
+
+  // Right: Subtotal, VAT, Total, Balance
+  doc.setFillColor(248, 250, 252) // bg-slate-50/50
   doc.setDrawColor(226, 232, 240)
   doc.roundedRect(col2X, totalsY, colWidth, blockHeight, 2, 2, 'FD')
 
@@ -322,13 +406,16 @@ export async function GET(request: NextRequest) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(100, 116, 139)
-  doc.text('Subtotal (Net Excl. VAT):', col2X + 4, tY)
+  doc.text('SUBTOTAL (Net):', col2X + 4, tY)
+  doc.setFont('helvetica', 'bold')
   doc.setTextColor(15, 23, 42)
   doc.text(`£${netTotal.toFixed(2)}`, pageWidth - margin - 4, tY, { align: 'right' })
 
   tY += 6
+  doc.setFont('helvetica', 'normal')
   doc.setTextColor(100, 116, 139)
-  doc.text('VAT (20% Standard UK Rate):', col2X + 4, tY)
+  doc.text('VAT (20%):', col2X + 4, tY)
+  doc.setFont('helvetica', 'bold')
   doc.setTextColor(15, 23, 42)
   doc.text(`£${vatAmount.toFixed(2)}`, pageWidth - margin - 4, tY, { align: 'right' })
 
@@ -345,52 +432,77 @@ export async function GET(request: NextRequest) {
   tY += 7.5
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
-  doc.setTextColor(22, 101, 52)
-  doc.text('Payments Received:', col2X + 4, tY)
+  doc.setTextColor(71, 85, 105)
+  doc.text('PAYMENTS RECEIVED:', col2X + 4, tY)
   doc.setFont('helvetica', 'bold')
+  doc.setTextColor(21, 128, 61)
   doc.text(`-£${totalPaid.toFixed(2)}`, pageWidth - margin - 4, tY, { align: 'right' })
 
   tY += 7.5
-  doc.setDrawColor(15, 23, 42)
+  doc.setDrawColor(148, 163, 184)
   doc.setLineWidth(0.4)
   doc.line(col2X + 4, tY - 1.5, pageWidth - margin - 4, tY - 1.5)
   doc.setLineWidth(0.2) // reset
 
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
+  doc.setFontSize(9.5)
+  doc.setTextColor(15, 23, 42)
+  doc.text('BALANCE DUE:', col2X + 4, tY + 2.5)
+
   if (balanceDue <= 0.01) {
-    doc.setTextColor(22, 101, 52) // emerald-700
-    doc.text('BALANCE DUE:', col2X + 4, tY + 2.5)
+    doc.setTextColor(21, 128, 61) // green-700
     doc.text('£0.00 (PAID IN FULL)', pageWidth - margin - 4, tY + 2.5, { align: 'right' })
   } else {
     doc.setTextColor(220, 38, 38) // red-600
-    doc.text('BALANCE DUE:', col2X + 4, tY + 2.5)
     doc.text(`£${balanceDue.toFixed(2)}`, pageWidth - margin - 4, tY + 2.5, { align: 'right' })
   }
 
-  // 5. Bank Transfer Remittance & Footer Details
+  // --- 5. BILLING & COMPANY INFORMATION FOOTER ---
   const footerY = totalsY + blockHeight + 6
 
   doc.setDrawColor(226, 232, 240)
   doc.line(margin, footerY, pageWidth - margin, footerY)
 
-  // Bank transfer box
+  // Left: Billing Information
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(7.5)
-  doc.setTextColor(71, 85, 105)
-  doc.text('REMITTANCE & PAYMENT DETAILS (BACS / BANK TRANSFER)', margin, footerY + 5)
+  doc.setTextColor(51, 65, 85) // text-slate-700
+  doc.text('BILLING INFORMATION', margin, footerY + 5)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7)
   doc.setTextColor(100, 116, 139)
-  doc.text('Bank: Barclays Bank   |   Sort Code: 20-91-45   |   Account No: 83920184   |   Account Name: Rumiscapes Ltd', margin, footerY + 9)
-  doc.text(`Please quote Invoice Ref: PAH-${booking.booking_reference} on bank transfers. Payment due upon receipt.`, margin, footerY + 13)
+  doc.text('• All charges are itemised in GBP (£).', margin, footerY + 9)
+  doc.text('• Payment is due upon check-out or as agreed by invoice terms.', margin, footerY + 13)
 
-  // Company registration & contact footer
   doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 41, 59)
+  doc.text('Bank Transfer Details (BACS):', margin, footerY + 18)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(71, 85, 105)
+  doc.text('Bank: Barclays Bank   |   Sort Code: 20-91-45', margin, footerY + 22)
+  doc.text('Account No: 83920184   |   Name: Rumiscapes Ltd', margin, footerY + 26)
+  doc.text('Payment due upon receipt. Please use invoice reference on transfer.', margin, footerY + 30)
+
+  // Right: Company Information
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.5)
+  doc.setTextColor(51, 65, 85)
+  doc.text('COMPANY INFORMATION', col2X, footerY + 5)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(15, 23, 42)
+  doc.text('Rumiscapes Ltd', col2X, footerY + 10)
+
+  doc.setFont('helvetica', 'normal')
   doc.setFontSize(7)
-  doc.setTextColor(148, 163, 184) // slate-400
-  doc.text('Rumiscapes Ltd trading as The Patten Arms Hotel  •  Parker Street, Warrington, WA1 1LS  •  Company No. 16117921', pageWidth / 2, 285, { align: 'center' })
+  doc.setTextColor(71, 85, 105)
+  doc.text('Trading as The Patten Arms Hotel', col2X, footerY + 14)
+  doc.text('Parker Street, Warrington, WA1 1LS', col2X, footerY + 18)
+  doc.text('Company No. 16117921', col2X, footerY + 22)
+  doc.text('Tel: 01925 636602   |   Email: info@pattenarms.co.uk', col2X, footerY + 26)
 
   const pdfBuffer = Buffer.from(doc.output('arraybuffer'))
 
