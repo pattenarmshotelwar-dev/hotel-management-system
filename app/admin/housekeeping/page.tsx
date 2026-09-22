@@ -586,7 +586,9 @@ export default function HousekeepingAdminPage() {
                             {getCleaningStatusLabel(log.status_after)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-slate-400 max-w-xs truncate">{log.notes || 'Routine cleaning'}</td>
+                        <td className="px-4 py-3 text-slate-600 max-w-sm text-[11px] leading-relaxed">
+                          {log.notes || 'Routine cleaning'}
+                        </td>
                       </tr>
                     ))}
                     {cleaningLogs.length === 0 && (
