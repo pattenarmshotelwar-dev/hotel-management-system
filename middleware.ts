@@ -38,9 +38,9 @@ export async function middleware(request: NextRequest) {
     if (user && pathname === '/login') {
       const url = request.nextUrl.clone()
       const email = user.email?.toLowerCase() || ''
-      if (email === 'frontdesk@patternarmswarhotel.co.uk' || email.startsWith('frontdesk')) {
+      if (email.startsWith('foh') || email.startsWith('frontdesk')) {
         url.pathname = '/frontdesk'
-      } else if (email.startsWith('housekeeping')) {
+      } else if (email.startsWith('clean') || email.startsWith('housekeeping')) {
         url.pathname = '/housekeeping'
       } else {
         url.pathname = '/admin'
@@ -72,8 +72,8 @@ export async function middleware(request: NextRequest) {
 
   // Strict role separation:
   const userEmail = user.email?.toLowerCase() || ''
-  const isFrontDesk = userEmail === 'frontdesk@patternarmswarhotel.co.uk' || userEmail.startsWith('frontdesk')
-  const isHousekeeping = userEmail.startsWith('housekeeping')
+  const isFrontDesk = userEmail.startsWith('foh') || userEmail.startsWith('frontdesk')
+  const isHousekeeping = userEmail.startsWith('clean') || userEmail.startsWith('housekeeping')
 
   // Front desk cannot access admin or housekeeping routes
   if (isFrontDesk && (pathname.startsWith('/admin') || pathname.startsWith('/housekeeping'))) {

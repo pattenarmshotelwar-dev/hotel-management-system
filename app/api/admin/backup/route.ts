@@ -13,9 +13,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: Management session required' }, { status: 401 })
     }
 
-    const userEmail = user.email?.toLowerCase() || ''
-    if (userEmail.startsWith('frontdesk') || userEmail.startsWith('housekeeping')) {
-      return NextResponse.json({ error: 'Forbidden: Admin access required for database export' }, { status: 403 })
+    const userEmail = user?.email?.toLowerCase() || ''
+    if (userEmail.startsWith('frontdesk') || userEmail.startsWith('foh') || userEmail.startsWith('housekeeping') || userEmail.startsWith('clean')) {
+      return NextResponse.json({ error: 'Only administrators can run backups' }, { status: 403 })
     }
 
     const adminSupabase: any = await createAdminClient()

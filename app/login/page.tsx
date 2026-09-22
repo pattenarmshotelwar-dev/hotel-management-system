@@ -10,40 +10,55 @@ import Image from 'next/image'
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState('habib')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [role, setRole] = useState<'admin' | 'frontdesk' | 'housekeeping'>('admin')
 
-  // Housekeeping & Front Desk shared credentials
-  const HOUSEKEEPING_EMAIL = process.env.NEXT_PUBLIC_HOUSEKEEPING_EMAIL || 'housekeeping@hotel.com'
-  const FRONTDESK_EMAIL = 'frontdesk@patternarmswarhotel.co.uk'
+  // Staff service accounts
+  const FOH_EMAIL = 'foh@pattenarms.com'
+  const CLEANING_EMAIL = 'cleaning@pattenarms.com'
+  const ADMIN_EMAIL = 'habib@pattenarms.com'
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    const loginEmail = role === 'frontdesk' ? FRONTDESK_EMAIL : (role === 'housekeeping' ? HOUSEKEEPING_EMAIL : email)
+    const trimmed = email.trim().toLowerCase()
+    let loginEmail = trimmed
+
+    if (role === 'frontdesk') {
+      loginEmail = FOH_EMAIL
+    } else if (role === 'housekeeping') {
+      loginEmail = CLEANING_EMAIL
+    } else {
+      if (trimmed === 'habib' || !trimmed) {
+        loginEmail = ADMIN_EMAIL
+      } else if (trimmed === 'foh') {
+        loginEmail = FOH_EMAIL
+      } else if (trimmed === 'cleaning' || trimmed === 'clean') {
+        loginEmail = CLEANING_EMAIL
+      }
+    }
 
     let { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
 
-    if (error && role === 'frontdesk') {
-      try {
-        const res = await fetch('/api/auth/setup-frontdesk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: FRONTDESK_EMAIL, password }),
-        })
-        if (res.ok) {
-          const retry = await supabase.auth.signInWithPassword({ email: FRONTDESK_EMAIL, password })
-          if (!retry.error && retry.data.user) {
-            data = retry.data
-            error = null
-          }
+    // Fallback retries for aliases
+    if (error) {
+      const fallbacks: Record<string, string[]> = {
+        [FOH_EMAIL]: ['frontdesk@patternarmswarhotel.co.uk'],
+        [CLEANING_EMAIL]: ['housekeeping@pattenarms.com'],
+        [ADMIN_EMAIL]: ['pattenarmshotelwar@gmail.com'],
+      }
+      const altEmails = fallbacks[loginEmail] || []
+      for (const alt of altEmails) {
+        const retry = await supabase.auth.signInWithPassword({ email: alt, password })
+        if (!retry.error && retry.data.user) {
+          data = retry.data
+          error = null
+          break
         }
-      } catch (setupErr) {
-        console.error('Setup error:', setupErr)
       }
     }
 
@@ -62,10 +77,11 @@ export default function LoginPage() {
         // ignore
       }
 
-      // Determine destination by role
-      if (role === 'frontdesk' || data.user.email === FRONTDESK_EMAIL) {
+      // Determine destination by user email
+      const signedInEmail = data.user.email?.toLowerCase() || ''
+      if (signedInEmail.startsWith('foh') || signedInEmail.startsWith('frontdesk')) {
         router.push('/frontdesk')
-      } else if (role === 'housekeeping' || data.user.email === HOUSEKEEPING_EMAIL) {
+      } else if (signedInEmail.startsWith('clean') || signedInEmail.startsWith('housekeeping')) {
         router.push('/housekeeping')
       } else {
         router.push('/admin')
@@ -97,34 +113,34 @@ export default function LoginPage() {
         {/* Role Tabs */}
         <div className="flex bg-slate-800 rounded-xl p-1 mb-6">
           <button
-            onClick={() => { setRole('admin'); setEmail(''); setPassword('') }}
+            onClick={() => { setRole('admin'); setEmail('habib'); setPassword('') }}
             className={`flex-1 py-2 px-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
               role === 'admin'
                 ? 'bg-blue-600 text-white shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Management
+            Admin
           </button>
           <button
-            onClick={() => { setRole('frontdesk'); setEmail(FRONTDESK_EMAIL); setPassword('') }}
+            onClick={() => { setRole('frontdesk'); setEmail(FOH_EMAIL); setPassword('') }}
             className={`flex-1 py-2 px-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
               role === 'frontdesk'
                 ? 'bg-blue-600 text-white shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Front Desk
+            Front of House
           </button>
           <button
-            onClick={() => { setRole('housekeeping'); setEmail(HOUSEKEEPING_EMAIL); setPassword('') }}
+            onClick={() => { setRole('housekeeping'); setEmail(CLEANING_EMAIL); setPassword('') }}
             className={`flex-1 py-2 px-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
               role === 'housekeeping'
                 ? 'bg-blue-600 text-white shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Housekeeping
+            Cleaning
           </button>
         </div>
 
@@ -134,14 +150,16 @@ export default function LoginPage() {
             {role === 'admin' && (
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Email Address
+                  Username or Email
                 </label>
                 <input
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@hotel.com"
+                  placeholder="habib"
                   required
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                 />
               </div>
@@ -149,18 +167,21 @@ export default function LoginPage() {
 
             {role === 'frontdesk' && (
               <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600">
-                <p className="text-slate-300 text-sm font-medium">Front Desk Reception Login</p>
+                <p className="text-slate-300 text-sm font-medium">Front of House Reception Login</p>
                 <p className="text-slate-400 text-xs mt-1">
-                  Account: <span className="text-blue-400 font-mono">frontdesk@patternarmswarhotel.co.uk</span>
+                  Account: <span className="text-blue-400 font-mono font-semibold">foh</span>
                 </p>
-                <p className="text-slate-400 text-xs mt-0.5">Enter the front desk password below</p>
+                <p className="text-slate-400 text-xs mt-0.5">Enter the Front of House password below</p>
               </div>
             )}
 
             {role === 'housekeeping' && (
               <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600">
-                <p className="text-slate-300 text-sm font-medium">Housekeeping Team Login</p>
-                <p className="text-slate-400 text-xs mt-1">Enter the shared housekeeping password below</p>
+                <p className="text-slate-300 text-sm font-medium">Cleaning & Housekeeping Login</p>
+                <p className="text-slate-400 text-xs mt-1">
+                  Account: <span className="text-blue-400 font-mono font-semibold">cleaning</span>
+                </p>
+                <p className="text-slate-400 text-xs mt-0.5">Enter the cleaning team password below</p>
               </div>
             )}
 

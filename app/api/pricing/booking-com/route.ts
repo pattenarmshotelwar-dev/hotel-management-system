@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   }
 
   const userEmail = user.email?.toLowerCase() || ''
-  if (userEmail.startsWith('frontdesk') || userEmail.startsWith('housekeeping')) {
+  if (userEmail.startsWith('frontdesk') || userEmail.startsWith('foh') || userEmail.startsWith('housekeeping') || userEmail.startsWith('clean')) {
     return NextResponse.json({ error: 'Forbidden: Management permissions required' }, { status: 403 })
   }
 

@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       const { data: { user } } = await serverSupabase.auth.getUser()
       const userEmail = user?.email?.toLowerCase() || ''
       // Only management/admin users can trigger user setup
-      if (user && !userEmail.startsWith('frontdesk') && !userEmail.startsWith('housekeeping')) {
+      if (user && !userEmail.startsWith('frontdesk') && !userEmail.startsWith('foh') && !userEmail.startsWith('housekeeping') && !userEmail.startsWith('clean')) {
         isAuthorized = true
       }
     }
@@ -34,10 +34,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
     }
 
-    // Safety constraint: This endpoint can only provision the front desk account, not arbitrary admin accounts
+    // Safety constraint: This endpoint can only provision staff service accounts
     const targetEmail = email.toLowerCase().trim()
-    if (targetEmail !== 'frontdesk@patternarmswarhotel.co.uk') {
-      return NextResponse.json({ error: 'This endpoint can only provision the front desk service account' }, { status: 400 })
+    const allowedStaffEmails = [
+      'foh@pattenarms.com',
+      'frontdesk@patternarmswarhotel.co.uk',
+      'cleaning@pattenarms.com',
+      'housekeeping@pattenarms.com'
+    ]
+    if (!allowedStaffEmails.includes(targetEmail)) {
+      return NextResponse.json({ error: 'This endpoint can only provision staff service accounts' }, { status: 400 })
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
