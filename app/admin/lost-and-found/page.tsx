@@ -27,61 +27,8 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-// Default starter items for The Patten Arms Hotel
-const INITIAL_LOST_ITEMS: LostFoundItem[] = [
-  {
-    id: 'lf_01',
-    item_reference: 'LF-101',
-    title: 'Apple iPhone 13 in navy blue silicone case',
-    category: 'electronics',
-    room_number: '14',
-    found_location: 'Bedside table drawer',
-    found_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-    found_by: 'Housekeeper Sarah',
-    status: 'unclaimed',
-    guest_name: 'David Wilson',
-    guest_phone: '+44 7700 900456',
-    guest_notified: true,
-    storage_bin: 'Safe Box A (Reception)',
-    notes: 'Phone has 15% battery, kept on charge in manager office.',
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: 'lf_02',
-    item_reference: 'LF-102',
-    title: 'Black leather Barbour jacket (Size L)',
-    category: 'clothing',
-    room_number: '08',
-    found_location: 'Wardrobe hanger',
-    found_date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
-    found_by: 'Housekeeper Maria',
-    status: 'unclaimed',
-    guest_name: 'James Harrison',
-    guest_phone: '+44 7700 900889',
-    guest_notified: false,
-    storage_bin: 'Lost Property Rail B',
-    notes: 'No wallet in pockets. High value item.',
-    created_at: new Date(Date.now() - 172800000).toISOString(),
-  },
-  {
-    id: 'lf_03',
-    item_reference: 'LF-103',
-    title: 'Set of car & house keys on Manchester United lanyard',
-    category: 'keys',
-    room_number: '21',
-    found_location: 'Under desk chair',
-    found_date: new Date(Date.now() - 259200000).toISOString().split('T')[0],
-    found_by: 'Duty Manager Tom',
-    status: 'claimed',
-    guest_name: 'Mark Taylor',
-    guest_phone: '+44 7700 900112',
-    guest_notified: true,
-    claimed_at: new Date(Date.now() - 36000000).toISOString(),
-    storage_bin: 'Key Cupboard',
-    notes: 'Guest collected in person. Identity verified via photo ID.',
-    created_at: new Date(Date.now() - 259200000).toISOString(),
-  },
-]
+// Default starter items for The Patten Arms Hotel (clean start)
+const INITIAL_LOST_ITEMS: LostFoundItem[] = []
 
 export default function LostAndFoundPage() {
   const supabase = createClient()
@@ -123,17 +70,25 @@ export default function LostAndFoundPage() {
     setRooms(roomsData ?? [])
 
     const saved = localStorage.getItem('patten_lost_and_found_items')
-    if (saved) {
+    let currentItems: LostFoundItem[] = []
+    if (saved !== null) {
       try {
         const parsed = JSON.parse(saved)
-        setItems(Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_LOST_ITEMS)
+        currentItems = Array.isArray(parsed) ? parsed : []
       } catch (e) {
-        setItems(INITIAL_LOST_ITEMS)
+        currentItems = []
       }
-    } else {
-      setItems(INITIAL_LOST_ITEMS)
-      localStorage.setItem('patten_lost_and_found_items', JSON.stringify(INITIAL_LOST_ITEMS))
     }
+
+    // Automatically purge legacy sample items (LF-101, LF-102, LF-103)
+    const hasPurged = localStorage.getItem('patten_lf_sample_purged_v2')
+    if (!hasPurged) {
+      currentItems = currentItems.filter(it => it.id !== 'lf_01' && it.id !== 'lf_02' && it.id !== 'lf_03')
+      localStorage.setItem('patten_lost_and_found_items', JSON.stringify(currentItems))
+      localStorage.setItem('patten_lf_sample_purged_v2', 'true')
+    }
+
+    setItems(currentItems)
     setLoading(false)
   }
 
