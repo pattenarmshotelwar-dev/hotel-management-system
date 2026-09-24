@@ -24,10 +24,17 @@ import {
   Link2,
   ExternalLink,
   Radio,
+  Key,
+  Plus,
+  X,
+  Tag,
+  Check,
+  Activity,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-interface EventItem {
+export interface EventItem {
   id: string
   title: string
   venue: string
@@ -37,61 +44,11 @@ interface EventItem {
   recommendedSurge: number
   description: string
   autoSurgeApplied?: boolean
+  url?: string
+  distanceMiles?: number
+  source?: 'ticketmaster' | 'warrington_radar' | 'custom'
+  startDate?: string
 }
-
-// Curated recurring & major events around Warrington, Halliwell Jones Stadium, Parr Hall, Haydock, & Creamfields
-const WARRINGTON_EVENTS: EventItem[] = [
-  {
-    id: 'evt_superleague_1',
-    title: 'Warrington Wolves vs Wigan Warriors (Super League Derby)',
-    venue: 'Halliwell Jones Stadium (0.7 miles)',
-    category: 'sports',
-    dateRange: 'Next Friday & Saturday',
-    impact: 'Very High',
-    recommendedSurge: 35,
-    description: 'Sellout local rugby derby bringing thousands of travelling fans. High demand for overnight rooms.',
-  },
-  {
-    id: 'evt_creamfields',
-    title: 'Creamfields Festival Weekend',
-    venue: 'Daresbury / Warrington Area (4.5 miles)',
-    category: 'festival',
-    dateRange: 'August Bank Holiday Weekend',
-    impact: 'Very High',
-    recommendedSurge: 60,
-    description: 'Major UK electronic festival (70,000 attendees). Warrington hotels typically command 2x to 3x standard rack rates.',
-  },
-  {
-    id: 'evt_parr_hall_gig',
-    title: 'Live Music Tour & Comedy Showcase',
-    venue: 'Warrington Parr Hall & Pyramid Arts Centre (0.4 miles)',
-    category: 'music',
-    dateRange: 'Coming Saturday Evening',
-    impact: 'Medium',
-    recommendedSurge: 15,
-    description: 'Historic live music and touring comedian venue in Warrington cultural quarter.',
-  },
-  {
-    id: 'evt_haydock_races',
-    title: 'Haydock Park Races — Grand National Weekend / Evening Fixture',
-    venue: 'Haydock Park Racecourse (7.5 miles via M6)',
-    category: 'sports',
-    dateRange: 'Upcoming Race Weekend',
-    impact: 'High',
-    recommendedSurge: 25,
-    description: 'Major horse racing weekend fixture with thousands of hotel night stays required across Cheshire and Warrington.',
-  },
-  {
-    id: 'evt_birchwood_conference',
-    title: 'Birchwood Park Nuclear & Engineering Business Expo',
-    venue: 'Birchwood Science Park (3.8 miles)',
-    category: 'business',
-    dateRange: 'Midweek (Tue - Thu)',
-    impact: 'High',
-    recommendedSurge: 20,
-    description: 'Substantial corporate contractor influx filling hotel rooms during weekday business trips.',
-  },
-]
 
 export default function PricingPage() {
   const supabase = createClient()
@@ -114,10 +71,125 @@ export default function PricingPage() {
   // Room custom overrides (base price, weekend price)
   const [roomRates, setRoomRates] = useState<Record<string, { base: number; weekend: number }>>({})
 
+  // Live automated event radar & integration state
+  const [events, setEvents] = useState<EventItem[]>([])
+  const [eventsLoading, setEventsLoading] = useState(true)
+  const [eventsCategory, setEventsCategory] = useState<string>('all')
+  const [eventsSource, setEventsSource] = useState<string>('Warrington Live Dynamic Radar')
+  const [lastEventsUpdate, setLastEventsUpdate] = useState<string | null>(null)
+  const [ticketmasterConnected, setTicketmasterConnected] = useState(false)
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false)
+  const [ticketmasterApiKey, setTicketmasterApiKey] = useState('')
+  const [showAddEventModal, setShowAddEventModal] = useState(false)
+  const [customEvents, setCustomEvents] = useState<EventItem[]>([])
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    venue: 'Patten Arms Hotel Area',
+    category: 'music' as 'sports' | 'music' | 'business' | 'festival',
+    dateRange: '',
+    impact: 'High' as 'Very High' | 'High' | 'Medium',
+    recommendedSurge: 20,
+    description: '',
+  })
+
   useEffect(() => {
     fetchRooms()
     loadSavedPricingConfig()
+    const savedKey = localStorage.getItem('patten_ticketmaster_api_key') || ''
+    if (savedKey) setTicketmasterApiKey(savedKey)
+    const savedCustom = localStorage.getItem('patten_custom_events')
+    if (savedCustom) {
+      try {
+        setCustomEvents(JSON.parse(savedCustom))
+      } catch (e) {}
+    }
+    fetchLiveEvents('all', savedKey)
   }, [])
+
+  const fetchLiveEvents = async (category = 'all', keyOverride?: string) => {
+    setEventsLoading(true)
+    try {
+      const keyToUse = keyOverride !== undefined ? keyOverride : (ticketmasterApiKey || localStorage.getItem('patten_ticketmaster_api_key') || '')
+      const url = new URL('/api/admin/events', window.location.origin)
+      if (category !== 'all') url.searchParams.set('category', category)
+      if (keyToUse) url.searchParams.set('apiKey', keyToUse)
+      url.searchParams.set('refresh', 'true')
+
+      const res = await fetch(url.toString())
+      const data = await res.json()
+      if (data.success && Array.isArray(data.events)) {
+        // Merge custom events
+        let savedCustomList: EventItem[] = customEvents
+        try {
+          const savedCustomStr = localStorage.getItem('patten_custom_events')
+          if (savedCustomStr) savedCustomList = JSON.parse(savedCustomStr)
+        } catch (e) {}
+
+        const matchingCustom = category === 'all' 
+          ? savedCustomList 
+          : savedCustomList.filter(c => c.category === category)
+
+        setEvents([...matchingCustom, ...data.events])
+        setEventsSource(data.source || 'Warrington Live Dynamic Radar')
+        setTicketmasterConnected(!!data.ticketmasterConnected)
+        setLastEventsUpdate(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))
+      }
+    } catch (err) {
+      console.error('Failed to fetch events:', err)
+      toast.error('Failed to refresh live events')
+    } finally {
+      setEventsLoading(false)
+    }
+  }
+
+  const handleSaveTicketmasterKey = () => {
+    localStorage.setItem('patten_ticketmaster_api_key', ticketmasterApiKey.trim())
+    setShowApiKeyModal(false)
+    toast.success('Ticketmaster API Key saved. Refreshing live events...')
+    fetchLiveEvents(eventsCategory, ticketmasterApiKey.trim())
+  }
+
+  const handleAddCustomEvent = () => {
+    if (!newEvent.title.trim() || !newEvent.dateRange.trim()) {
+      toast.error('Please enter an event title and date')
+      return
+    }
+    const created: EventItem = {
+      id: `custom_${Date.now()}`,
+      title: newEvent.title.trim(),
+      venue: newEvent.venue.trim() || 'Patten Arms Hotel Area',
+      category: newEvent.category,
+      dateRange: newEvent.dateRange.trim(),
+      impact: newEvent.impact,
+      recommendedSurge: Number(newEvent.recommendedSurge) || 20,
+      description: newEvent.description.trim() || 'Custom hotel/local high-demand event.',
+      source: 'custom',
+    }
+    const updated = [created, ...customEvents]
+    setCustomEvents(updated)
+    localStorage.setItem('patten_custom_events', JSON.stringify(updated))
+    setEvents(prev => [created, ...prev])
+    setShowAddEventModal(false)
+    setNewEvent({
+      title: '',
+      venue: 'Patten Arms Hotel Area',
+      category: 'music',
+      dateRange: '',
+      impact: 'High',
+      recommendedSurge: 20,
+      description: '',
+    })
+    toast.success(`Added custom event: ${created.title}`)
+  }
+
+  const handleDeleteCustomEvent = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const updated = customEvents.filter(item => item.id !== id)
+    setCustomEvents(updated)
+    localStorage.setItem('patten_custom_events', JSON.stringify(updated))
+    setEvents(prev => prev.filter(item => item.id !== id))
+    toast.info('Custom event removed')
+  }
 
   const loadSavedPricingConfig = () => {
     try {
@@ -194,7 +266,7 @@ export default function PricingPage() {
       // Find another active event if any
       const activeIds = Object.keys(updatedEvents).filter(id => updatedEvents[id])
       if (activeIds.length > 0) {
-        const other = WARRINGTON_EVENTS.find(e => e.id === activeIds[0])
+        const other = events.find(e => e.id === activeIds[0])
         setSurgeMultiplier(other ? other.recommendedSurge : 0)
         setSurgeReason(other ? other.title : '')
       } else {
@@ -361,88 +433,222 @@ export default function PricingPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Warrington Local Event Radar Card */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-3">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                   <MapPin className="w-4 h-4" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900">Warrington & Cheshire Event Radar</h2>
-                  <p className="text-[11px] text-slate-500">Live tracker for concerts, rugby matches, and festivals near Patten Arms</p>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-slate-900">Warrington & Cheshire Live Event Radar</h2>
+                    {ticketmasterConnected ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Ticketmaster Live API
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                        Live Dynamic Radar (WA1)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Live demand tracker for rugby derbies, Parr Hall gigs, and regional festivals • {lastEventsUpdate ? `Updated at ${lastEventsUpdate}` : 'Auto-synced'}
+                  </p>
                 </div>
               </div>
-              <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
-                5 High-Demand Dates
-              </span>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => fetchLiveEvents(eventsCategory)}
+                  disabled={eventsLoading}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  title="Force refresh live events feed"
+                >
+                  <RefreshCw className={cn('w-3.5 h-3.5', eventsLoading && 'animate-spin')} />
+                  <span className="hidden sm:inline">Refresh Feed</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowApiKeyModal(true)}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+                  title="Configure Ticketmaster API Key"
+                >
+                  <Key className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="hidden sm:inline">API Key</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAddEventModal(true)}
+                  className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Custom Event</span>
+                </button>
+              </div>
             </div>
 
-            {/* Events List */}
-            <div className="space-y-3">
-              {WARRINGTON_EVENTS.map(event => {
-                const isSurgeOn = !!activeSurgeEvents[event.id]
+            {/* Category Filter Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+              {[
+                { id: 'all', label: 'All Dates' },
+                { id: 'sports', label: '🏉 Sports & Rugby' },
+                { id: 'music', label: '🎵 Music & Comedy' },
+                { id: 'festival', label: '🎪 Festivals' },
+                { id: 'business', label: '💼 Business Expos' },
+              ].map(cat => {
+                const isActive = eventsCategory === cat.id
                 return (
-                  <div
-                    key={event.id}
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setEventsCategory(cat.id)
+                      fetchLiveEvents(cat.id)
+                    }}
                     className={cn(
-                      'p-4 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3',
-                      isSurgeOn
-                        ? 'bg-amber-50/70 border-amber-300 ring-1 ring-amber-300'
-                        : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                      'px-3 py-1.5 rounded-xl font-semibold transition shrink-0 cursor-pointer',
+                      isActive
+                        ? 'bg-slate-900 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     )}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-xs font-bold text-slate-900">{event.title}</h3>
-                        <span
-                          className={cn(
-                            'text-[10px] font-bold px-2 py-0.5 rounded-full',
-                            event.impact === 'Very High'
-                              ? 'bg-red-100 text-red-700'
-                              : event.impact === 'High'
-                              ? 'bg-orange-100 text-orange-800'
-                              : 'bg-blue-100 text-blue-700'
-                          )}
-                        >
-                          {event.impact} Demand
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                        <span className="flex items-center gap-1 font-medium">
-                          <MapPin className="w-3 h-3 text-slate-400" /> {event.venue}
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1 font-semibold text-slate-700">
-                          <Calendar className="w-3 h-3 text-blue-500" /> {event.dateRange}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                        {event.description}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2.5 shrink-0 sm:self-center">
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-400 block uppercase font-semibold">Recommended</span>
-                        <span className="text-xs font-extrabold text-amber-700 font-mono">+{event.recommendedSurge}% Surge</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleEventSurge(event)}
-                        className={cn(
-                          'px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs',
-                          isSurgeOn
-                            ? 'bg-amber-600 text-white hover:bg-amber-700'
-                            : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
-                        )}
-                      >
-                        <Flame className={cn('w-3.5 h-3.5', isSurgeOn ? 'fill-white' : 'text-amber-500')} />
-                        {isSurgeOn ? 'Surge Applied' : 'Apply Surge'}
-                      </button>
-                    </div>
-                  </div>
+                    {cat.label}
+                  </button>
                 )
               })}
             </div>
+
+            {/* Events List */}
+            {eventsLoading ? (
+              <div className="py-12 text-center space-y-3 bg-slate-50 rounded-xl border border-slate-200">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+                <p className="text-xs text-slate-500 font-medium">Scanning live Warrington & Cheshire fixtures...</p>
+              </div>
+            ) : events.length === 0 ? (
+              <div className="py-10 text-center space-y-3 bg-slate-50 rounded-xl border border-slate-200">
+                <AlertCircle className="w-6 h-6 text-slate-400 mx-auto" />
+                <p className="text-xs text-slate-500">No events found in this category.</p>
+                <button
+                  onClick={() => {
+                    setEventsCategory('all')
+                    fetchLiveEvents('all')
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold"
+                >
+                  View All Events
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {events.map(event => {
+                  const isSurgeOn = !!activeSurgeEvents[event.id]
+                  return (
+                    <div
+                      key={event.id}
+                      className={cn(
+                        'p-4 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3',
+                        isSurgeOn
+                          ? 'bg-amber-50/70 border-amber-300 ring-1 ring-amber-300'
+                          : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                      )}
+                    >
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-xs font-bold text-slate-900 truncate max-w-md">
+                            {event.title}
+                          </h3>
+                          {event.url && (
+                            <a
+                              href={event.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 transition p-0.5"
+                              title="Open event details / tickets"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                          <span
+                            className={cn(
+                              'text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0',
+                              event.impact === 'Very High'
+                                ? 'bg-red-100 text-red-700'
+                                : event.impact === 'High'
+                                ? 'bg-orange-100 text-orange-800'
+                                : 'bg-blue-100 text-blue-700'
+                            )}
+                          >
+                            {event.impact} Demand
+                          </span>
+                          {event.source === 'ticketmaster' ? (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
+                              Ticketmaster
+                            </span>
+                          ) : event.source === 'custom' ? (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded">
+                              In-House Custom
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded">
+                              Warrington Radar
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
+                          <span className="flex items-center gap-1 font-medium text-slate-600">
+                            <MapPin className="w-3 h-3 text-slate-400 shrink-0" /> {event.venue}
+                          </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1 font-semibold text-slate-800">
+                            <Calendar className="w-3 h-3 text-blue-500 shrink-0" /> {event.dateRange}
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] text-slate-600 leading-relaxed">
+                          {event.description}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 shrink-0 sm:self-center">
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-400 block uppercase font-semibold">Recommended</span>
+                          <span className="text-xs font-extrabold text-amber-700 font-mono">+{event.recommendedSurge}% Surge</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleEventSurge(event)}
+                          className={cn(
+                            'px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-2xs',
+                            isSurgeOn
+                              ? 'bg-amber-600 text-white hover:bg-amber-700'
+                              : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                          )}
+                        >
+                          <Flame className={cn('w-3.5 h-3.5', isSurgeOn ? 'fill-white' : 'text-amber-500')} />
+                          {isSurgeOn ? 'Surge Applied' : 'Apply Surge'}
+                        </button>
+                        {event.source === 'custom' && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteCustomEvent(event.id, e)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="Delete custom event"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Quick Surge Manual Slider */}
@@ -789,6 +995,252 @@ export default function PricingPage() {
           </table>
         </div>
       </div>
+
+      {/* Ticketmaster API Key Configuration Modal */}
+      {showApiKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <Key className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Ticketmaster Live Feed Setup</h3>
+                  <p className="text-[11px] text-slate-500">Automate real-time Warrington concert & stadium sync</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowApiKeyModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-600">
+              <p>
+                Enter your free <strong>Ticketmaster Discovery API Key</strong> to automatically ingest live concerts, touring artists, and stadium fixtures within a 20-mile radius of Patten Arms Hotel.
+              </p>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Ticketmaster Consumer API Key
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. AbC123xYz987..."
+                  value={ticketmasterApiKey}
+                  onChange={e => setTicketmasterApiKey(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="p-3 bg-purple-50/70 border border-purple-100 rounded-xl text-[11px] text-purple-900 space-y-1">
+                <p className="font-semibold">Need a free API key?</p>
+                <p>
+                  You can register for a 100% free account on the{' '}
+                  <a
+                    href="https://developer.ticketmaster.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-700 underline font-bold inline-flex items-center gap-0.5"
+                  >
+                    Ticketmaster Developer Portal <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                  {' '}(includes 5,000 free API queries/day).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              {ticketmasterApiKey ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTicketmasterApiKey('')
+                    localStorage.removeItem('patten_ticketmaster_api_key')
+                    setShowApiKeyModal(false)
+                    toast.info('Ticketmaster API key removed. Using Warrington dynamic radar.')
+                    fetchLiveEvents(eventsCategory, '')
+                  }}
+                  className="text-xs text-red-600 hover:underline font-medium cursor-pointer"
+                >
+                  Clear Key
+                </button>
+              ) : <div />}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowApiKeyModal(false)}
+                  className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveTicketmasterKey}
+                  className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer"
+                >
+                  Save & Connect Feed
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Custom Hotel Event Modal */}
+      {showAddEventModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Add Custom Hotel Event</h3>
+                  <p className="text-[11px] text-slate-500">Track local weddings, conferences, or private banquets</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddEventModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Event Title
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Warrington Town Hall Charity Gala / Wedding Block"
+                  value={newEvent.title}
+                  onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={newEvent.category}
+                    onChange={e => setNewEvent({ ...newEvent, category: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="music">Music & Gala</option>
+                    <option value="sports">Sports Fixture</option>
+                    <option value="business">Corporate / Business</option>
+                    <option value="festival">Festival / Celebration</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Demand Level
+                  </label>
+                  <select
+                    value={newEvent.impact}
+                    onChange={e => setNewEvent({ ...newEvent, impact: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="Very High">Very High (+35–60%)</option>
+                    <option value="High">High (+20–30%)</option>
+                    <option value="Medium">Medium (+10–15%)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Dates & Schedule
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Sat, 18 Oct 2026 • Evening Reception"
+                  value={newEvent.dateRange}
+                  onChange={e => setNewEvent({ ...newEvent, dateRange: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Venue / Location
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Patten Arms Function Room or Warrington Town Centre"
+                  value={newEvent.venue}
+                  onChange={e => setNewEvent({ ...newEvent, venue: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Recommended Surge Uplift
+                  </label>
+                  <span className="text-xs font-bold text-amber-700 font-mono">
+                    +{newEvent.recommendedSurge}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={5}
+                  max={80}
+                  step={5}
+                  value={newEvent.recommendedSurge}
+                  onChange={e => setNewEvent({ ...newEvent, recommendedSurge: Number(e.target.value) })}
+                  className="w-full accent-amber-600 cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Notes / Description
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Brief description of expected guests, party size, or room block requirements..."
+                  value={newEvent.description}
+                  onChange={e => setNewEvent({ ...newEvent, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowAddEventModal(false)}
+                className="px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddCustomEvent}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer"
+              >
+                Save Event
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
