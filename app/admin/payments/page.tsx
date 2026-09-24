@@ -29,13 +29,18 @@ import {
   DollarSign,
   Receipt,
   FileText,
+  SlidersHorizontal,
+  ArrowUpDown,
+  ChevronDown,
+  RotateCcw,
+  Filter,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import PaymentReceiptModal from '@/components/payments/PaymentReceiptModal'
 import RecordPaymentModal from '@/components/payments/RecordPaymentModal'
 import OfficialInvoiceModal from '@/components/invoices/OfficialInvoiceModal'
 
-type DatePreset = 'all' | 'today' | 'week' | 'month' | 'custom'
+type DatePreset = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'
 
 export default function PaymentsPage() {
   const supabase = createClient()
@@ -52,6 +57,10 @@ export default function PaymentsPage() {
   const [datePreset, setDatePreset] = useState<DatePreset>('all')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
+  const [minAmount, setMinAmount] = useState('')
+  const [maxAmount, setMaxAmount] = useState('')
+  const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc' | 'guest_asc'>('date_desc')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Inline Editing
   const [editingPayment, setEditingPayment] = useState<string | null>(null)
@@ -114,18 +123,33 @@ export default function PaymentsPage() {
 
   // Filtered Payments Calculation
   const filtered = useMemo(() => {
-    return payments.filter(p => {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+
+    const result = payments.filter(p => {
       const booking = p.booking as any
+      const searchLower = search.toLowerCase().trim()
+      const guestFullName = `${booking?.guest_first_name ?? ''} ${booking?.guest_last_name ?? ''}`.toLowerCase()
+
       const matchSearch =
-        search === '' ||
-        (booking?.booking_reference ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        (booking?.guest_first_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        (booking?.guest_last_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        (p.reference_number ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        ((booking?.room?.room_number ?? '').toString()).includes(search)
+        searchLower === '' ||
+        (booking?.booking_reference ?? '').toLowerCase().includes(searchLower) ||
+        (booking?.guest_first_name ?? '').toLowerCase().includes(searchLower) ||
+        (booking?.guest_last_name ?? '').toLowerCase().includes(searchLower) ||
+        guestFullName.includes(searchLower) ||
+        (booking?.guest_email ?? '').toLowerCase().includes(searchLower) ||
+        (p.reference_number ?? '').toLowerCase().includes(searchLower) ||
+        (p.stripe_payment_intent_id ?? '').toLowerCase().includes(searchLower) ||
+        (p.notes ?? '').toLowerCase().includes(searchLower) ||
+        ((booking?.room?.room_number ?? '').toString()).includes(searchLower)
+
+      if (!matchSearch) return false
 
       const matchMethod = methodFilter === 'all' || p.method === methodFilter
+      if (!matchMethod) return false
+
       const matchStatus = statusFilter === 'all' || p.status === statusFilter
+      if (!matchStatus) return false
+
       const matchTab =
         activeTab === 'all'
           ? true
@@ -134,26 +158,45 @@ export default function PaymentsPage() {
           : activeTab === 'booking_com'
           ? ['booking_com_vcc', 'booking_com_payout'].includes(p.method)
           : ['cash', 'bank_transfer'].includes(p.method)
+      if (!matchTab) return false
+
+      // Amount Range Filter
+      if (minAmount && !isNaN(parseFloat(minAmount)) && p.amount < parseFloat(minAmount)) return false
+      if (maxAmount && !isNaN(parseFloat(maxAmount)) && p.amount > parseFloat(maxAmount)) return false
 
       // Date Presets
-      let matchDate = true
       const pDate = p.created_at.split('T')[0]
       if (datePreset === 'today') {
-        matchDate = pDate === todayStr
+        if (pDate !== todayStr) return false
+      } else if (datePreset === 'yesterday') {
+        if (pDate !== yesterday) return false
       } else if (datePreset === 'week') {
         const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
-        matchDate = pDate >= weekAgo
+        if (pDate < weekAgo) return false
       } else if (datePreset === 'month') {
         const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
-        matchDate = pDate >= monthStart
-      } else if (datePreset === 'custom') {
-        if (customStart && pDate < customStart) matchDate = false
-        if (customEnd && pDate > customEnd) matchDate = false
+        if (pDate < monthStart) return false
+      } else if (datePreset === 'custom' || customStart || customEnd) {
+        if (customStart && pDate < customStart) return false
+        if (customEnd && pDate > customEnd) return false
       }
 
-      return matchSearch && matchMethod && matchStatus && matchTab && matchDate
+      return true
     })
-  }, [payments, search, methodFilter, statusFilter, activeTab, datePreset, customStart, customEnd, todayStr])
+
+    return [...result].sort((a, b) => {
+      if (sortBy === 'date_desc') return (b.created_at || '').localeCompare(a.created_at || '')
+      if (sortBy === 'date_asc') return (a.created_at || '').localeCompare(b.created_at || '')
+      if (sortBy === 'amount_desc') return b.amount - a.amount
+      if (sortBy === 'amount_asc') return a.amount - b.amount
+      if (sortBy === 'guest_asc') {
+        const gA = `${(a.booking as any)?.guest_first_name ?? ''} ${(a.booking as any)?.guest_last_name ?? ''}`.toLowerCase()
+        const gB = `${(b.booking as any)?.guest_first_name ?? ''} ${(b.booking as any)?.guest_last_name ?? ''}`.toLowerCase()
+        return gA.localeCompare(gB)
+      }
+      return 0
+    })
+  }, [payments, search, methodFilter, statusFilter, activeTab, datePreset, customStart, customEnd, minAmount, maxAmount, sortBy, todayStr])
 
   // Financial Summary
   const stats = useMemo(() => {
@@ -266,6 +309,7 @@ export default function PaymentsPage() {
         {[
           { id: 'all', label: 'All Time' },
           { id: 'today', label: 'Today (Shift)' },
+          { id: 'yesterday', label: 'Yesterday' },
           { id: 'week', label: 'Past 7 Days' },
           { id: 'month', label: 'This Month' },
           { id: 'custom', label: 'Custom Range' },
@@ -343,7 +387,7 @@ export default function PaymentsPage() {
           <select
             value={methodFilter}
             onChange={e => setMethodFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none font-medium text-slate-700"
           >
             <option value="all">All Methods</option>
             <option value="cash">Cash</option>
@@ -357,7 +401,7 @@ export default function PaymentsPage() {
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
+            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none font-medium text-slate-700"
           >
             <option value="all">All Statuses</option>
             <option value="succeeded">Paid</option>
@@ -365,6 +409,190 @@ export default function PaymentsPage() {
             <option value="failed">Failed</option>
             <option value="refunded">Refunded</option>
           </select>
+
+          {/* More Filters Toggle */}
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 border rounded-xl text-xs font-semibold transition',
+              showAdvanced || minAmount || maxAmount || sortBy !== 'date_desc'
+                ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm'
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+            )}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>More Filters</span>
+            {(minAmount || maxAmount || sortBy !== 'date_desc') && (
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+            )}
+            <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-200', showAdvanced && 'rotate-180')} />
+          </button>
+        </div>
+
+        {/* Collapsible Advanced Filter Drawer */}
+        {showAdvanced && (
+          <div className="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50/50 p-3 rounded-xl border border-dashed border-slate-200">
+            {/* Min Amount */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Min Amount (£)</label>
+              <input
+                type="number"
+                min="0"
+                step="5"
+                placeholder="e.g. 20"
+                value={minAmount}
+                onChange={e => setMinAmount(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+
+            {/* Max Amount */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Max Amount (£)</label>
+              <input
+                type="number"
+                min="0"
+                step="5"
+                placeholder="e.g. 500"
+                value={maxAmount}
+                onChange={e => setMaxAmount(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+
+            {/* Quick Amount Presets */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Quick Range</label>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => { setMinAmount(''); setMaxAmount('50') }}
+                  className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-md text-[10px] font-semibold text-slate-600"
+                >
+                  &lt; £50
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMinAmount('50'); setMaxAmount('150') }}
+                  className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-md text-[10px] font-semibold text-slate-600"
+                >
+                  £50-£150
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMinAmount('150'); setMaxAmount('') }}
+                  className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-md text-[10px] font-semibold text-slate-600"
+                >
+                  &gt; £150
+                </button>
+              </div>
+            </div>
+
+            {/* Sort Order */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Sort Transactions</label>
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as any)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+              >
+                <option value="date_desc">Date (Newest first)</option>
+                <option value="date_asc">Date (Oldest first)</option>
+                <option value="amount_desc">Amount (Highest first)</option>
+                <option value="amount_asc">Amount (Lowest first)</option>
+                <option value="guest_asc">Guest Name (A to Z)</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Active Filter Chips Ribbon */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-slate-400 font-medium">Active Filters:</span>
+            {search && (
+              <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-blue-200">
+                Search: "{search}"
+                <button onClick={() => setSearch('')} className="hover:text-blue-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {activeTab !== 'all' && (
+              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-slate-200">
+                Channel: {activeTab === 'booking_com' ? 'Booking.com' : activeTab === 'offline' ? 'Cash/Bank' : activeTab}
+                <button onClick={() => setActiveTab('all')} className="hover:text-slate-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {methodFilter !== 'all' && (
+              <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-purple-200">
+                Method: {getPaymentMethodLabel(methodFilter as any)}
+                <button onClick={() => setMethodFilter('all')} className="hover:text-purple-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {statusFilter !== 'all' && (
+              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-emerald-200">
+                Status: {getPaymentStatusLabel(statusFilter as any)}
+                <button onClick={() => setStatusFilter('all')} className="hover:text-emerald-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {datePreset !== 'all' && (
+              <span className="inline-flex items-center gap-1 bg-teal-50 text-teal-800 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-teal-200">
+                Period: {datePreset === 'today' ? 'Today' : datePreset === 'yesterday' ? 'Yesterday' : datePreset === 'week' ? 'Past 7 Days' : datePreset === 'month' ? 'This Month' : 'Custom'}
+                <button onClick={() => { setDatePreset('all'); setCustomStart(''); setCustomEnd('') }} className="hover:text-teal-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {(minAmount || maxAmount) && (
+              <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-rose-200">
+                Amount: {minAmount ? `£${minAmount}` : '£0'} – {maxAmount ? `£${maxAmount}` : '∞'}
+                <button onClick={() => { setMinAmount(''); setMaxAmount('') }} className="hover:text-rose-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {sortBy !== 'date_desc' && (
+              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-slate-200">
+                Sort: {sortBy.replace('_', ' ')}
+                <button onClick={() => setSortBy('date_desc')} className="hover:text-slate-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+
+            {(search || activeTab !== 'all' || methodFilter !== 'all' || statusFilter !== 'all' || datePreset !== 'all' || minAmount || maxAmount || sortBy !== 'date_desc') ? (
+              <button
+                onClick={() => {
+                  setSearch('')
+                  setActiveTab('all')
+                  setMethodFilter('all')
+                  setStatusFilter('all')
+                  setDatePreset('all')
+                  setCustomStart('')
+                  setCustomEnd('')
+                  setMinAmount('')
+                  setMaxAmount('')
+                  setSortBy('date_desc')
+                }}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline ml-1"
+              >
+                <RotateCcw className="w-3 h-3" /> Clear All
+              </button>
+            ) : (
+              <span className="text-slate-400 italic text-[11px]">None (Showing all)</span>
+            )}
+          </div>
+
+          <div className="text-slate-500 font-semibold text-xs ml-auto whitespace-nowrap">
+            Showing <span className="text-slate-800 font-bold">{filtered.length}</span> of {payments.length} transactions
+          </div>
         </div>
       </div>
 
@@ -395,7 +623,25 @@ export default function PaymentsPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-16 text-center text-slate-400 text-xs">
-                    No transactions found for the selected filter.
+                    <p className="font-semibold text-slate-600 text-sm mb-1">No transactions match your filters</p>
+                    <p className="text-slate-400 mb-3">Try adjusting your date range, payment method, or amount limits.</p>
+                    <button
+                      onClick={() => {
+                        setSearch('')
+                        setActiveTab('all')
+                        setMethodFilter('all')
+                        setStatusFilter('all')
+                        setDatePreset('all')
+                        setCustomStart('')
+                        setCustomEnd('')
+                        setMinAmount('')
+                        setMaxAmount('')
+                        setSortBy('date_desc')
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Clear All Filters
+                    </button>
                   </td>
                 </tr>
               ) : (

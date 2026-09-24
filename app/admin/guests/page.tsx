@@ -26,6 +26,12 @@ import {
   Clock,
   BedDouble,
   CheckCircle,
+  SlidersHorizontal,
+  ArrowUpDown,
+  ChevronDown,
+  RotateCcw,
+  Filter,
+  Globe,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -35,7 +41,12 @@ export default function GuestCRMPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterTag, setFilterTag] = useState<'all' | 'vip' | 'repeat' | 'blacklisted'>('all')
+  const [filterTag, setFilterTag] = useState<'all' | 'vip' | 'repeat' | 'blacklisted' | 'single_stay'>('all')
+  const [countryFilter, setCountryFilter] = useState('all')
+  const [spendTierFilter, setSpendTierFilter] = useState<'all' | 'vip' | 'mid' | 'budget' | 'zero'>('all')
+  const [stayCountFilter, setStayCountFilter] = useState<'all' | '1' | '2-4' | '5+'>('all')
+  const [sortBy, setSortBy] = useState<'spend_desc' | 'stays_desc' | 'recent_desc' | 'name_asc' | 'created_desc'>('created_desc')
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Modals
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null)
@@ -159,28 +170,68 @@ export default function GuestCRMPage() {
     return stats
   }, [guests, bookings])
 
+  // Unique countries
+  const countries = useMemo(() => {
+    const set = new Set(guests.map(g => g.country).filter(Boolean) as string[])
+    return Array.from(set).sort()
+  }, [guests])
+
   // Filtered list
   const filteredGuests = useMemo(() => {
-    return guests.filter(g => {
+    const result = guests.filter(g => {
       const q = search.toLowerCase().trim()
+      const fullName = `${g.first_name} ${g.last_name}`.toLowerCase()
       const matchesQuery =
         !q ||
-        `${g.first_name} ${g.last_name}`.toLowerCase().includes(q) ||
+        fullName.includes(q) ||
         (g.email && g.email.toLowerCase().includes(q)) ||
         (g.phone && g.phone.includes(q)) ||
         (g.vehicle_reg && g.vehicle_reg.toLowerCase().includes(q)) ||
-        (g.id_passport_number && g.id_passport_number.toLowerCase().includes(q))
+        (g.id_passport_number && g.id_passport_number.toLowerCase().includes(q)) ||
+        (g.country && g.country.toLowerCase().includes(q)) ||
+        (g.notes && g.notes.toLowerCase().includes(q))
 
       if (!matchesQuery) return false
 
-      const stat = guestStats[g.id] || { totalStays: 0 }
-      if (filterTag === 'vip') return g.is_vip
-      if (filterTag === 'repeat') return stat.totalStays > 1
-      if (filterTag === 'blacklisted') return g.is_blacklisted
+      const stat = guestStats[g.id] || { totalStays: 0, totalSpent: 0 }
+      if (filterTag === 'vip' && !g.is_vip) return false
+      if (filterTag === 'repeat' && stat.totalStays <= 1) return false
+      if (filterTag === 'blacklisted' && !g.is_blacklisted) return false
+      if (filterTag === 'single_stay' && stat.totalStays !== 1) return false
+
+      // Country filter
+      if (countryFilter !== 'all' && g.country !== countryFilter) return false
+
+      // Lifetime Spend Tier filter
+      if (spendTierFilter === 'vip' && stat.totalSpent < 500) return false
+      if (spendTierFilter === 'mid' && (stat.totalSpent < 150 || stat.totalSpent >= 500)) return false
+      if (spendTierFilter === 'budget' && (stat.totalSpent <= 0 || stat.totalSpent >= 150)) return false
+      if (spendTierFilter === 'zero' && stat.totalSpent > 0) return false
+
+      // Stay Count filter
+      if (stayCountFilter === '1' && stat.totalStays !== 1) return false
+      if (stayCountFilter === '2-4' && (stat.totalStays < 2 || stat.totalStays > 4)) return false
+      if (stayCountFilter === '5+' && stat.totalStays < 5) return false
 
       return true
     })
-  }, [guests, search, filterTag, guestStats])
+
+    return [...result].sort((a, b) => {
+      const statA = guestStats[a.id] || { totalStays: 0, totalSpent: 0, lastStayDate: '' }
+      const statB = guestStats[b.id] || { totalStays: 0, totalSpent: 0, lastStayDate: '' }
+
+      if (sortBy === 'spend_desc') return statB.totalSpent - statA.totalSpent
+      if (sortBy === 'stays_desc') return statB.totalStays - statA.totalStays
+      if (sortBy === 'recent_desc') return (statB.lastStayDate || '').localeCompare(statA.lastStayDate || '')
+      if (sortBy === 'name_asc') {
+        const nameA = `${a.first_name} ${a.last_name}`.toLowerCase()
+        const nameB = `${b.first_name} ${b.last_name}`.toLowerCase()
+        return nameA.localeCompare(nameB)
+      }
+      if (sortBy === 'created_desc') return (b.created_at || '').localeCompare(a.created_at || '')
+      return 0
+    })
+  }, [guests, search, filterTag, countryFilter, spendTierFilter, stayCountFilter, sortBy, guestStats])
 
   const saveLocalOverride = (guestId: string, updates: Partial<Guest>) => {
     const localCRM = localStorage.getItem('patten_guest_crm_overrides')
@@ -326,20 +377,25 @@ export default function GuestCRMPage() {
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Guests In CRM</p>
           <p className="text-xl font-extrabold text-slate-900 mt-0.5">{guests.length}</p>
+      {/* KPI Ribbon */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Guests In CRM</p>
+          <p className="text-xl font-extrabold text-slate-900 mt-0.5">{guests.length}</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Repeat Visitors</p>
           <p className="text-xl font-extrabold text-blue-600 mt-0.5">
             {Object.values(guestStats).filter(s => s.totalStays > 1).length}
           </p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">VIP Guests</p>
           <p className="text-xl font-extrabold text-amber-500 mt-0.5">
             {guests.filter(g => g.is_vip).length}
           </p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Caution / Blacklisted</p>
           <p className="text-xl font-extrabold text-red-600 mt-0.5">
             {guests.filter(g => g.is_blacklisted).length}
@@ -348,43 +404,215 @@ export default function GuestCRMPage() {
       </div>
 
       {/* Search & Filter Ribbon */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name, phone, email, plate number, or ID..."
-            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50/50"
-          />
-        </div>
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name, phone, email, plate number, or ID..."
+              className="w-full pl-9 pr-8 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50/50"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                <X className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+            )}
+          </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto">
-          {[
-            { id: 'all', label: `All Guests (${guests.length})` },
-            { id: 'vip', label: `VIPs (${guests.filter(g => g.is_vip).length})` },
-            { id: 'repeat', label: 'Repeat Visitors' },
-            { id: 'blacklisted', label: `Blacklist (${guests.filter(g => g.is_blacklisted).length})` },
-          ].map(tab => (
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            {[
+              { id: 'all', label: `All Guests (${guests.length})` },
+              { id: 'vip', label: `VIPs (${guests.filter(g => g.is_vip).length})` },
+              { id: 'repeat', label: `Repeat (${Object.values(guestStats).filter(s => s.totalStays > 1).length})` },
+              { id: 'single_stay', label: 'First-Timer' },
+              { id: 'blacklisted', label: `Caution (${guests.filter(g => g.is_blacklisted).length})` },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setFilterTag(tab.id as any)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap cursor-pointer',
+                  filterTag === tab.id
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+
+            {/* More Filters Toggle */}
             <button
-              key={tab.id}
-              onClick={() => setFilterTag(tab.id as any)}
+              onClick={() => setShowAdvanced(!showAdvanced)}
               className={cn(
-                'px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap cursor-pointer',
-                filterTag === tab.id
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                'flex items-center gap-1.5 px-3 py-1.5 border rounded-xl text-xs font-semibold transition cursor-pointer',
+                showAdvanced || countryFilter !== 'all' || spendTierFilter !== 'all' || stayCountFilter !== 'all' || sortBy !== 'created_desc'
+                  ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
               )}
             >
-              {tab.label}
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>More Filters</span>
+              {(countryFilter !== 'all' || spendTierFilter !== 'all' || stayCountFilter !== 'all' || sortBy !== 'created_desc') && (
+                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+              )}
+              <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-200', showAdvanced && 'rotate-180')} />
             </button>
-          ))}
+          </div>
+        </div>
+
+        {/* Collapsible Advanced Filters Drawer */}
+        {showAdvanced && (
+          <div className="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50/50 p-3 rounded-xl border border-dashed border-slate-200">
+            {/* Country / Nationality */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Country / Nationality</label>
+              <select
+                value={countryFilter}
+                onChange={e => setCountryFilter(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="all">All Countries</option>
+                {countries.map(c => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Lifetime Spend Tier */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Lifetime Spend Tier</label>
+              <select
+                value={spendTierFilter}
+                onChange={e => setSpendTierFilter(e.target.value as any)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="all">All Spend Levels</option>
+                <option value="vip">High Value (£500+)</option>
+                <option value="mid">Mid Tier (£150 – £500)</option>
+                <option value="budget">Budget (&lt; £150)</option>
+                <option value="zero">Zero Spend (£0 / Inquiries)</option>
+              </select>
+            </div>
+
+            {/* Stay Count Filter */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Stay Frequency</label>
+              <select
+                value={stayCountFilter}
+                onChange={e => setStayCountFilter(e.target.value as any)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="all">All Stay Counts</option>
+                <option value="1">1 Stay Only (First-time)</option>
+                <option value="2-4">2 – 4 Stays</option>
+                <option value="5+">5+ Stays (Frequent Regular)</option>
+              </select>
+            </div>
+
+            {/* Sort Order */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Sort Profiles By</label>
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as any)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+              >
+                <option value="created_desc">Newest Guest Profile</option>
+                <option value="spend_desc">Total Spent (£ High to Low)</option>
+                <option value="stays_desc">Total Stays (Most to Fewest)</option>
+                <option value="recent_desc">Most Recent Stay Date</option>
+                <option value="name_asc">Guest Name (A to Z)</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Active Filter Chips Ribbon */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-slate-400 font-medium">Active Filters:</span>
+            {search && (
+              <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-blue-200">
+                Search: "{search}"
+                <button onClick={() => setSearch('')} className="hover:text-blue-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {filterTag !== 'all' && (
+              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-slate-200">
+                Segment: {filterTag === 'vip' ? 'VIP' : filterTag === 'repeat' ? 'Repeat' : filterTag === 'single_stay' ? 'First-Timer' : 'Blacklist'}
+                <button onClick={() => setFilterTag('all')} className="hover:text-slate-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {countryFilter !== 'all' && (
+              <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-purple-200">
+                Country: {countryFilter}
+                <button onClick={() => setCountryFilter('all')} className="hover:text-purple-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {spendTierFilter !== 'all' && (
+              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-emerald-200">
+                Spend: {spendTierFilter === 'vip' ? 'High Value (£500+)' : spendTierFilter === 'mid' ? 'Mid Tier (£150-£500)' : spendTierFilter === 'budget' ? 'Budget (<£150)' : '£0'}
+                <button onClick={() => setSpendTierFilter('all')} className="hover:text-emerald-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {stayCountFilter !== 'all' && (
+              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-amber-200">
+                Stays: {stayCountFilter}
+                <button onClick={() => setStayCountFilter('all')} className="hover:text-amber-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {sortBy !== 'created_desc' && (
+              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg font-medium text-[11px] border border-slate-200">
+                Sort: {sortBy.replace('_', ' ')}
+                <button onClick={() => setSortBy('created_desc')} className="hover:text-slate-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+
+            {(search || filterTag !== 'all' || countryFilter !== 'all' || spendTierFilter !== 'all' || stayCountFilter !== 'all' || sortBy !== 'created_desc') ? (
+              <button
+                onClick={() => {
+                  setSearch('')
+                  setFilterTag('all')
+                  setCountryFilter('all')
+                  setSpendTierFilter('all')
+                  setStayCountFilter('all')
+                  setSortBy('created_desc')
+                }}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline ml-1"
+              >
+                <RotateCcw className="w-3 h-3" /> Clear All
+              </button>
+            ) : (
+              <span className="text-slate-400 italic text-[11px]">None (Showing all)</span>
+            )}
+          </div>
+
+          <div className="text-slate-500 font-semibold text-xs ml-auto whitespace-nowrap">
+            Showing <span className="text-slate-800 font-bold">{filteredGuests.length}</span> of {guests.length} guest profiles
+          </div>
         </div>
       </div>
 
       {/* Guests Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex justify-center items-center py-24">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -392,8 +620,21 @@ export default function GuestCRMPage() {
         ) : filteredGuests.length === 0 ? (
           <div className="text-center py-20 px-4 text-slate-400">
             <Users className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-            <p className="font-semibold text-sm">No guests found</p>
-            <p className="text-xs text-slate-400 mt-1">Try adjusting your search or filters</p>
+            <p className="font-semibold text-slate-600 text-sm">No guests found</p>
+            <p className="text-xs text-slate-400 mt-1">Try adjusting your search criteria, country, or filters</p>
+            <button
+              onClick={() => {
+                setSearch('')
+                setFilterTag('all')
+                setCountryFilter('all')
+                setSpendTierFilter('all')
+                setStayCountFilter('all')
+                setSortBy('created_desc')
+              }}
+              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Clear All Filters
+            </button>
           </div>
         ) : (
           <div className="overflow-x-auto">

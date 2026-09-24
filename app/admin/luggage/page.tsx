@@ -23,36 +23,7 @@ import {
 import { toast } from 'sonner'
 import Image from 'next/image'
 
-const DEFAULT_LUGGAGE: LuggageItem[] = [
-  {
-    id: 'lug_1',
-    tag_number: 'LUG-01',
-    guest_name: 'David Miller',
-    guest_phone: '+44 7700 900145',
-    room_number: '204',
-    bag_count: 2,
-    bag_description: '1x Large black Samsonite suitcase + 1 navy duffel',
-    storage_location: 'Behind Reception',
-    check_in_time: new Date(Date.now() - 3600000 * 3).toISOString(),
-    expected_collection_time: '17:00',
-    status: 'stored',
-    notes: 'Arrived on morning train from London, meeting client in Birchwood',
-  },
-  {
-    id: 'lug_2',
-    tag_number: 'LUG-02',
-    guest_name: 'Emma Watson',
-    guest_phone: '+44 7700 900289',
-    room_number: '108',
-    bag_count: 1,
-    bag_description: 'Red roller cabin bag with luggage tag',
-    storage_location: 'Luggage Cupboard A',
-    check_in_time: new Date(Date.now() - 3600000 * 5).toISOString(),
-    expected_collection_time: '15:30',
-    status: 'stored',
-    notes: 'Checked out at 10:30, collecting after lunch in town centre',
-  },
-]
+const DEFAULT_LUGGAGE: LuggageItem[] = []
 
 export default function LuggageTrackerPage() {
   const supabase = createClient()
@@ -90,16 +61,25 @@ export default function LuggageTrackerPage() {
 
   const loadLuggage = () => {
     const saved = localStorage.getItem('patten_luggage_records')
+    let currentItems: LuggageItem[] = []
     if (saved) {
       try {
-        setItems(JSON.parse(saved))
+        const parsed = JSON.parse(saved)
+        currentItems = Array.isArray(parsed) ? parsed : []
       } catch (e) {
-        setItems(DEFAULT_LUGGAGE)
+        currentItems = []
       }
-    } else {
-      setItems(DEFAULT_LUGGAGE)
-      localStorage.setItem('patten_luggage_records', JSON.stringify(DEFAULT_LUGGAGE))
     }
+
+    // Automatically purge legacy sample items
+    const hasPurged = localStorage.getItem('patten_lug_sample_purged_v2')
+    if (!hasPurged) {
+      currentItems = currentItems.filter(it => it.id !== 'lug_1' && it.id !== 'lug_2')
+      localStorage.setItem('patten_luggage_records', JSON.stringify(currentItems))
+      localStorage.setItem('patten_lug_sample_purged_v2', 'true')
+    }
+
+    setItems(currentItems)
   }
 
   const saveItems = (newItems: LuggageItem[]) => {

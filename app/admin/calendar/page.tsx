@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Booking, Room } from '@/lib/types'
 import { formatDate, formatCurrency, getBookingSourceColor, getRoomTypeLabel, generateBookingReference, cn } from '@/lib/utils'
 import { addDays, format, startOfDay, differenceInDays, parseISO } from 'date-fns'
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Plus, X, CreditCard, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Plus, X, CreditCard, Check, Search, Layers, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -38,6 +38,8 @@ export default function CalendarPage() {
   const [daysVisible, setDaysVisible]           = useState<DaysVisible>(30)
   const [colorMode, setColorMode]               = useState<ColorMode>('source')
   const [filter, setFilter]                     = useState<'all' | 'single' | 'double' | 'twin_single' | 'family'>('all')
+  const [floorFilter, setFloorFilter]           = useState<string>('all')
+  const [calendarSearch, setCalendarSearch]     = useState<string>('')
   const [selectedBooking, setSelectedBooking]   = useState<Booking | null>(null)
   const [selectedPayments, setSelectedPayments] = useState<{ amount: number; status: string }[]>([])
   const [loadingPayments, setLoadingPayments]   = useState(false)
@@ -90,9 +92,38 @@ export default function CalendarPage() {
   const getDayOccupancy = (dateStr: string) =>
     bookings.filter(b => !b.is_maintenance_block && b.check_in_date <= dateStr && b.check_out_date > dateStr).length
 
-  const filteredRooms = filter === 'all' ? rooms : rooms.filter(r => r.room_type === filter)
-  const grouped: Record<string, Room[]> = {}
-  filteredRooms.forEach(r => { if (!grouped[r.room_type]) grouped[r.room_type] = []; grouped[r.room_type].push(r) })
+  const floors = useMemo(() => Array.from(new Set(rooms.map(r => r.floor))).sort((a, b) => a - b), [rooms])
+
+  const filteredRooms = useMemo(() => {
+    return rooms.filter(r => {
+      if (filter !== 'all' && r.room_type !== filter) return false
+      if (floorFilter !== 'all' && r.floor.toString() !== floorFilter) return false
+
+      if (calendarSearch.trim()) {
+        const q = calendarSearch.toLowerCase().trim()
+        const matchesRoom = r.room_number.includes(q) || r.room_type.toLowerCase().includes(q)
+        const hasMatchingBooking = bookings.some(
+          b =>
+            b.room_id === r.id &&
+            ((b.guest_first_name || '').toLowerCase().includes(q) ||
+              (b.guest_last_name || '').toLowerCase().includes(q) ||
+              `${b.guest_first_name || ''} ${b.guest_last_name || ''}`.toLowerCase().includes(q) ||
+              (b.booking_reference || '').toLowerCase().includes(q))
+        )
+        if (!matchesRoom && !hasMatchingBooking) return false
+      }
+      return true
+    })
+  }, [rooms, filter, floorFilter, calendarSearch, bookings])
+
+  const grouped: Record<string, Room[]> = useMemo(() => {
+    const res: Record<string, Room[]> = {}
+    filteredRooms.forEach(r => {
+      if (!res[r.room_type]) res[r.room_type] = []
+      res[r.room_type].push(r)
+    })
+    return res
+  }, [filteredRooms])
 
   const handleQuickSubmit = async () => {
     if (!quickCreate || !quickForm.firstName || !quickForm.checkOut) {
@@ -166,15 +197,63 @@ export default function CalendarPage() {
           ))}
         </div>
 
+        {/* Search Room or Guest */}
+        <div className="relative min-w-[170px] max-w-[220px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search room or guest..."
+            value={calendarSearch}
+            onChange={e => setCalendarSearch(e.target.value)}
+            className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {calendarSearch && (
+            <button onClick={() => setCalendarSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2">
+              <X className="w-3 h-3 text-slate-400" />
+            </button>
+          )}
+        </div>
+
+        {/* Floor Filter */}
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2 py-1 text-xs">
+          <Layers className="w-3.5 h-3.5 text-slate-400" />
+          <select
+            value={floorFilter}
+            onChange={e => setFloorFilter(e.target.value)}
+            className="bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer"
+          >
+            <option value="all">All Floors</option>
+            {floors.map(f => (
+              <option key={f} value={f.toString()}>
+                {f === 0 ? 'Ground Floor' : `Floor ${f}`}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Room type filter */}
         <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1 ml-auto">
           {(['all', 'single', 'double', 'twin_single', 'family'] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
               className={cn('px-3 py-1.5 text-xs font-medium rounded-lg transition capitalize', filter === f ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100')}>
-              {f === 'all' ? 'All' : f === 'twin_single' ? 'Twin' : f.charAt(0).toUpperCase() + f.slice(1)}
+              {f === 'all' ? 'All Types' : f === 'twin_single' ? 'Twin' : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
+
+        {(calendarSearch || filter !== 'all' || floorFilter !== 'all') && (
+          <button
+            onClick={() => {
+              setCalendarSearch('')
+              setFilter('all')
+              setFloorFilter('all')
+            }}
+            title="Reset Filters"
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-medium hover:bg-rose-100 transition"
+          >
+            <RotateCcw className="w-3 h-3" /> Clear ({filteredRooms.length}/{rooms.length})
+          </button>
+        )}
 
         <button onClick={handleSync} disabled={syncing}
           className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-xl hover:bg-slate-700 transition disabled:opacity-50">
