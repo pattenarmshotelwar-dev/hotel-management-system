@@ -18,8 +18,10 @@ import {
   LogOut,
   Menu,
   X,
+  Hotel,
+  Sparkles,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
@@ -41,6 +43,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter()
   const supabase = createClient()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [userEmail, setUserEmail] = useState<string>('')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.email) {
+        setUserEmail(data.user.email)
+      }
+    })
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -126,11 +137,40 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        {/* Logout in Sidebar */}
-        <div className="px-3 py-4 border-t border-slate-700">
+        {/* Portal Switchers */}
+        <div className="px-3 py-2 border-t border-slate-800">
+          <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider px-3 mb-1.5">
+            Switch Portals
+          </p>
+          <div className="space-y-0.5">
+            <Link
+              href="/frontdesk"
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition"
+            >
+              <Hotel className="w-3.5 h-3.5 text-blue-400" />
+              <span>Front Desk Mode</span>
+            </Link>
+            <Link
+              href="/housekeeping"
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+              <span>Cleaner App</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* User Info & Logout in Sidebar */}
+        <div className="px-3 py-3 border-t border-slate-800 bg-slate-950/40">
+          {userEmail && (
+            <div className="px-3 mb-2">
+              <p className="text-[10px] text-slate-500 uppercase font-semibold">Logged In</p>
+              <p className="text-xs text-slate-300 font-mono truncate">{userEmail}</p>
+            </div>
+          )}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-red-400 w-full transition-all"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-red-400 w-full transition-all"
           >
             <LogOut className="w-4 h-4" />
             Sign Out

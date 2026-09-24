@@ -4,52 +4,83 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Shield, User, Hotel, CalendarCheck, Sparkles, Receipt, Code2 } from 'lucide-react'
 import Image from 'next/image'
+
+type DepartmentRole = 'manager' | 'foh' | 'bookings' | 'housekeeping' | 'accounts' | 'developer'
+
+interface RoleConfig {
+  id: DepartmentRole
+  label: string
+  email: string
+  destination: string
+  icon: any
+  tag: string
+}
+
+const ROLES: RoleConfig[] = [
+  { id: 'manager', label: 'Manager', email: 'manager@pattenarms.co.uk', destination: '/admin', icon: Shield, tag: 'Admin' },
+  { id: 'foh', label: 'Front of House', email: 'info@pattenarms.co.uk', destination: '/frontdesk', icon: Hotel, tag: 'Reception' },
+  { id: 'bookings', label: 'Bookings', email: 'bookings@pattenarms.co.uk', destination: '/admin/bookings', icon: CalendarCheck, tag: 'Reservations' },
+  { id: 'housekeeping', label: 'Housekeeping', email: 'housekeeping@pattenarms.co.uk', destination: '/housekeeping', icon: Sparkles, tag: 'Cleaning' },
+  { id: 'accounts', label: 'Accounts', email: 'accounts@pattenarms.co.uk', destination: '/admin/payments', icon: Receipt, tag: 'Finance' },
+  { id: 'developer', label: 'Developer', email: 'dev@uvdigital.co.uk', destination: '/admin', icon: Code2, tag: 'Full Access' },
+]
 
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
-  const [email, setEmail] = useState('habib')
+  const [selectedRole, setSelectedRole] = useState<DepartmentRole>('manager')
+  const [email, setEmail] = useState('manager@pattenarms.co.uk')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [role, setRole] = useState<'admin' | 'frontdesk' | 'housekeeping'>('admin')
 
-  // Staff service accounts
-  const FOH_EMAIL = 'foh@pattenarms.com'
-  const CLEANING_EMAIL = 'cleaning@pattenarms.com'
-  const ADMIN_EMAIL = 'habib@pattenarms.com'
+  const handleRoleSelect = (role: RoleConfig) => {
+    setSelectedRole(role.id)
+    setEmail(role.email)
+    setPassword('')
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    const trimmed = email.trim().toLowerCase()
-    let loginEmail = trimmed
+    const rawInput = email.trim().toLowerCase()
+    let loginEmail = rawInput
 
-    if (role === 'frontdesk') {
-      loginEmail = FOH_EMAIL
-    } else if (role === 'housekeeping') {
-      loginEmail = CLEANING_EMAIL
-    } else {
-      if (trimmed === 'habib' || !trimmed) {
-        loginEmail = ADMIN_EMAIL
-      } else if (trimmed === 'foh') {
-        loginEmail = FOH_EMAIL
-      } else if (trimmed === 'cleaning' || trimmed === 'clean') {
-        loginEmail = CLEANING_EMAIL
-      }
+    // Map common aliases/shortcuts to official emails
+    const aliasMap: Record<string, string> = {
+      'manager': 'manager@pattenarms.co.uk',
+      'admin': 'manager@pattenarms.co.uk',
+      'habib': 'manager@pattenarms.co.uk',
+      'info': 'info@pattenarms.co.uk',
+      'foh': 'info@pattenarms.co.uk',
+      'reception': 'info@pattenarms.co.uk',
+      'bookings': 'bookings@pattenarms.co.uk',
+      'booking': 'bookings@pattenarms.co.uk',
+      'housekeeping': 'housekeeping@pattenarms.co.uk',
+      'clean': 'housekeeping@pattenarms.co.uk',
+      'cleaning': 'housekeeping@pattenarms.co.uk',
+      'accounts': 'accounts@pattenarms.co.uk',
+      'finance': 'accounts@pattenarms.co.uk',
+      'dev': 'dev@uvdigital.co.uk',
+      'developer': 'dev@uvdigital.co.uk',
+    }
+
+    if (aliasMap[rawInput]) {
+      loginEmail = aliasMap[rawInput]
     }
 
     let { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
 
-    // Fallback retries for aliases
+    // Fallbacks if user entered an alternative alias
     if (error) {
       const fallbacks: Record<string, string[]> = {
-        [FOH_EMAIL]: ['frontdesk@patternarmswarhotel.co.uk'],
-        [CLEANING_EMAIL]: ['housekeeping@pattenarms.com'],
-        [ADMIN_EMAIL]: ['pattenarmshotelwar@gmail.com'],
+        'dev@uvdigital.co.uk': ['developer@pattenarms.co.uk', 'dev@pattenarms.co.uk'],
+        'manager@pattenarms.co.uk': ['habib@pattenarms.com', 'pattenarmshotelwar@gmail.com'],
+        'info@pattenarms.co.uk': ['foh@pattenarms.com', 'frontdesk@patternarmswarhotel.co.uk'],
+        'housekeeping@pattenarms.co.uk': ['housekeeping@pattenarms.com', 'cleaning@pattenarms.com'],
       }
       const altEmails = fallbacks[loginEmail] || []
       for (const alt of altEmails) {
@@ -63,7 +94,7 @@ export default function LoginPage() {
     }
 
     if (error) {
-      toast.error(error.message)
+      toast.error(error.message || 'Invalid login credentials')
       setLoading(false)
       return
     }
@@ -77,12 +108,18 @@ export default function LoginPage() {
         // ignore
       }
 
-      // Determine destination by user email
+      // Determine destination by logged-in user email
       const signedInEmail = data.user.email?.toLowerCase() || ''
-      if (signedInEmail.startsWith('foh') || signedInEmail.startsWith('frontdesk')) {
+      if (signedInEmail.startsWith('dev') || signedInEmail.includes('uvdigital')) {
+        router.push('/admin')
+      } else if (signedInEmail.startsWith('info') || signedInEmail.startsWith('foh') || signedInEmail.startsWith('frontdesk')) {
         router.push('/frontdesk')
-      } else if (signedInEmail.startsWith('clean') || signedInEmail.startsWith('housekeeping')) {
+      } else if (signedInEmail.startsWith('housekeeping') || signedInEmail.startsWith('clean')) {
         router.push('/housekeeping')
+      } else if (signedInEmail.startsWith('bookings')) {
+        router.push('/admin/bookings')
+      } else if (signedInEmail.startsWith('accounts')) {
+        router.push('/admin/payments')
       } else {
         router.push('/admin')
       }
@@ -91,12 +128,14 @@ export default function LoginPage() {
     setLoading(false)
   }
 
+  const activeRoleConfig = ROLES.find(r => r.id === selectedRole) || ROLES[0]
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo & Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-3">
             <Image
               src="/logo.jpg"
               alt="The Patten Arms Hotel"
@@ -107,88 +146,67 @@ export default function LoginPage() {
               unoptimized
             />
           </div>
-          <p className="text-slate-400 mt-1">Sign in to your dashboard</p>
+          <p className="text-slate-400 text-xs sm:text-sm">Hotel Management System Portal</p>
         </div>
 
-        {/* Role Tabs */}
-        <div className="flex bg-slate-800 rounded-xl p-1 mb-6">
-          <button
-            onClick={() => { setRole('admin'); setEmail('habib'); setPassword('') }}
-            className={`flex-1 py-2 px-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
-              role === 'admin'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Admin
-          </button>
-          <button
-            onClick={() => { setRole('frontdesk'); setEmail(FOH_EMAIL); setPassword('') }}
-            className={`flex-1 py-2 px-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
-              role === 'frontdesk'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Front of House
-          </button>
-          <button
-            onClick={() => { setRole('housekeeping'); setEmail(CLEANING_EMAIL); setPassword('') }}
-            className={`flex-1 py-2 px-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
-              role === 'housekeeping'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Cleaning
-          </button>
+        {/* Quick Role Switcher Pills */}
+        <div className="grid grid-cols-3 gap-1.5 bg-slate-800/90 border border-slate-700 p-1.5 rounded-2xl mb-4 shadow-lg">
+          {ROLES.map(role => {
+            const isSelected = selectedRole === role.id
+            const Icon = role.icon
+            return (
+              <button
+                key={role.id}
+                type="button"
+                onClick={() => handleRoleSelect(role)}
+                className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all flex flex-col items-center justify-center gap-1 ${
+                  isSelected
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span className="truncate max-w-full">{role.label}</span>
+              </button>
+            )
+          })}
         </div>
 
-        {/* Login Form */}
-        <div className="bg-slate-800 rounded-2xl p-8 shadow-xl border border-slate-700">
-          <form onSubmit={handleLogin} className="space-y-5">
-            {role === 'admin' && (
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Username or Email
-                </label>
-                <input
-                  type="text"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="habib"
-                  required
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                />
-              </div>
-            )}
+        {/* Login Form Box */}
+        <div className="bg-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl border border-slate-700">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/60">
+            <div>
+              <p className="text-white text-sm font-bold">{activeRoleConfig.label} Sign In</p>
+              <p className="text-slate-400 text-xs mt-0.5">{activeRoleConfig.tag} Access</p>
+            </div>
+            <span className="text-[11px] font-mono text-blue-400 bg-blue-950/80 border border-blue-800/50 px-2.5 py-1 rounded-lg">
+              {activeRoleConfig.email}
+            </span>
+          </div>
 
-            {role === 'frontdesk' && (
-              <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600">
-                <p className="text-slate-300 text-sm font-medium">Front of House Reception Login</p>
-                <p className="text-slate-400 text-xs mt-1">
-                  Account: <span className="text-blue-400 font-mono font-semibold">foh</span>
-                </p>
-                <p className="text-slate-400 text-xs mt-0.5">Enter the Front of House password below</p>
-              </div>
-            )}
-
-            {role === 'housekeeping' && (
-              <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600">
-                <p className="text-slate-300 text-sm font-medium">Cleaning & Housekeeping Login</p>
-                <p className="text-slate-400 text-xs mt-1">
-                  Account: <span className="text-blue-400 font-mono font-semibold">cleaning</span>
-                </p>
-                <p className="text-slate-400 text-xs mt-0.5">Enter the cleaning team password below</p>
-              </div>
-            )}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Email Address or Username
+              </label>
+              <input
+                type="text"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. manager@pattenarms.co.uk"
+                required
+                autoCapitalize="none"
+                autoCorrect="off"
+                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm font-medium"
+              />
+            </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  Password
+                </label>
+              </div>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -196,7 +214,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition pr-12"
+                  className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition pr-12 text-sm"
                 />
                 <button
                   type="button"
@@ -211,15 +229,16 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md text-sm mt-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Signing in...' : `Sign In to ${activeRoleConfig.label}`}
             </button>
           </form>
         </div>
 
-        <div className="flex items-center justify-center gap-2.5 text-slate-400 text-xs mt-6 opacity-85 hover:opacity-100 transition-opacity">
+        {/* Footer Branding */}
+        <div className="flex items-center justify-center gap-2 text-slate-400 text-xs mt-6 opacity-85 hover:opacity-100 transition-opacity">
           <span>Created by</span>
           <Image
             src="/uv-digital-logo.png"

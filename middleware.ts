@@ -38,10 +38,16 @@ export async function middleware(request: NextRequest) {
     if (user && pathname === '/login') {
       const url = request.nextUrl.clone()
       const email = user.email?.toLowerCase() || ''
-      if (email.startsWith('foh') || email.startsWith('frontdesk')) {
+      if (email.startsWith('dev') || email.includes('uvdigital')) {
+        url.pathname = '/admin'
+      } else if (email.startsWith('info') || email.startsWith('foh') || email.startsWith('frontdesk')) {
         url.pathname = '/frontdesk'
       } else if (email.startsWith('clean') || email.startsWith('housekeeping')) {
         url.pathname = '/housekeeping'
+      } else if (email.startsWith('bookings')) {
+        url.pathname = '/admin/bookings'
+      } else if (email.startsWith('accounts')) {
+        url.pathname = '/admin/payments'
       } else {
         url.pathname = '/admin'
       }
@@ -70,10 +76,16 @@ export async function middleware(request: NextRequest) {
     return redirectResponse
   }
 
-  // Strict role separation:
+  // Role separation & Developer Super-Access
   const userEmail = user.email?.toLowerCase() || ''
-  const isFrontDesk = userEmail.startsWith('foh') || userEmail.startsWith('frontdesk')
-  const isHousekeeping = userEmail.startsWith('clean') || userEmail.startsWith('housekeeping')
+  const isDeveloper = userEmail.startsWith('dev') || userEmail.includes('uvdigital')
+  const isFrontDesk = !isDeveloper && (userEmail.startsWith('info') || userEmail.startsWith('foh') || userEmail.startsWith('frontdesk'))
+  const isHousekeeping = !isDeveloper && (userEmail.startsWith('clean') || userEmail.startsWith('housekeeping'))
+
+  // Developers have unrestricted access to all areas (admin, frontdesk, housekeeping)
+  if (isDeveloper) {
+    return supabaseResponse
+  }
 
   // Front desk cannot access admin or housekeeping routes
   if (isFrontDesk && (pathname.startsWith('/admin') || pathname.startsWith('/housekeeping'))) {

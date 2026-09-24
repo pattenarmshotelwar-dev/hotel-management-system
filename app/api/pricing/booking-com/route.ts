@@ -57,7 +57,9 @@ export async function POST(request: NextRequest) {
   }
 
   const userEmail = user.email?.toLowerCase() || ''
-  if (userEmail.startsWith('frontdesk') || userEmail.startsWith('foh') || userEmail.startsWith('housekeeping') || userEmail.startsWith('clean')) {
+  const isDev = userEmail.startsWith('dev') || userEmail.includes('uvdigital')
+  const isStaff = userEmail.startsWith('frontdesk') || userEmail.startsWith('foh') || userEmail.startsWith('info') || userEmail.startsWith('housekeeping') || userEmail.startsWith('clean')
+  if (isStaff && !isDev) {
     return NextResponse.json({ error: 'Forbidden: Management permissions required' }, { status: 403 })
   }
 
