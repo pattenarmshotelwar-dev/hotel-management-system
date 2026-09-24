@@ -28,9 +28,11 @@ import {
   Download,
   Database,
   Lock,
+  MessageSquare,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import NewRoomModal from '@/components/settings/NewRoomModal'
+import WhatsAppSettingsTab from '@/components/settings/WhatsAppSettingsTab'
 
 export default function SettingsPage() {
   const supabase = createClient()
@@ -39,7 +41,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [syncingAll, setSyncingAll] = useState(false)
-  const [activeTab, setActiveTab] = useState<'rooms' | 'ical' | 'hotel' | 'addons' | 'security'>('rooms')
+  const [activeTab, setActiveTab] = useState<'rooms' | 'ical' | 'hotel' | 'whatsapp' | 'addons' | 'security'>('rooms')
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [floorFilter, setFloorFilter] = useState('all')
@@ -311,6 +313,7 @@ export default function SettingsPage() {
           { id: 'rooms', label: `Room Inventory (${rooms.length})` },
           { id: 'ical', label: `Booking.com iCal (${configuredIcalCount}/${rooms.length} linked)` },
           { id: 'hotel', label: 'Hotel Profile & Policies' },
+          { id: 'whatsapp', label: '💬 WhatsApp Messaging' },
           { id: 'addons', label: `Add-ons & Fees (${addonPresets.length})` },
           { id: 'security', label: 'Data Safety & Backup' },
         ].map(tab => (
@@ -824,7 +827,12 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* TAB 4: ADD-ONS & INCIDENTAL FEE PRESETS */}
+          {/* TAB 4: WHATSAPP & SMS MESSAGING */}
+          {activeTab === 'whatsapp' && (
+            <WhatsAppSettingsTab hotelConfig={hotelConfig} />
+          )}
+
+          {/* TAB 5: ADD-ONS & INCIDENTAL FEE PRESETS */}
           {activeTab === 'addons' && (
             <div className="space-y-4">
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">

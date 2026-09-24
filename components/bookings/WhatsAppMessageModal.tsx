@@ -8,17 +8,18 @@ import {
   generateBookingConfirmationWhatsAppText,
   generatePostStayReviewWhatsAppText,
 } from '@/lib/utils'
-import { X, MessageSquare, Send, CheckCircle2, Copy, Star, Calendar, RefreshCw } from 'lucide-react'
+import { X, MessageSquare, Send, CheckCircle2, Copy, Star, Calendar, RefreshCw, Wifi } from 'lucide-react'
 import { toast } from 'sonner'
+import { getSavedWhatsAppSettings, formatWhatsAppTemplate, createWhatsAppDispatchUrl } from '@/lib/whatsapp'
 
 interface Props {
   booking: Booking
-  defaultType?: 'confirmation' | 'review'
+  defaultType?: 'confirmation' | 'wifi' | 'review'
   onClose: () => void
 }
 
 export default function WhatsAppMessageModal({ booking, defaultType = 'confirmation', onClose }: Props) {
-  const [messageType, setMessageType] = useState<'confirmation' | 'review'>(defaultType)
+  const [messageType, setMessageType] = useState<'confirmation' | 'wifi' | 'review'>(defaultType)
   const [guestPhone, setGuestPhone] = useState(booking.guest_phone || '')
   const [customText, setCustomText] = useState('')
   const [copied, setCopied] = useState(false)
@@ -37,9 +38,37 @@ export default function WhatsAppMessageModal({ booking, defaultType = 'confirmat
   const roomType = (booking as any).room?.room_type?.replace('_', ' ') ?? 'Room'
   const guestFullName = `${booking.guest_first_name} ${booking.guest_last_name}`.trim() || 'Valued Guest'
 
-  // Regenerate message template when type or hotel config changes
+  // Regenerate message template from configured settings when type or hotel config changes
   useEffect(() => {
-    if (messageType === 'confirmation') {
+    const waSettings = getSavedWhatsAppSettings()
+    const templateIdMap: Record<'confirmation' | 'wifi' | 'review', string> = {
+      confirmation: 'tpl_booking_confirm',
+      wifi: 'tpl_checkin_wifi',
+      review: 'tpl_checkout_review',
+    }
+
+    const tplObj = waSettings.templates.find(t => t.id === templateIdMap[messageType])
+    
+    const vars = {
+      guest_name: guestFullName,
+      booking_reference: booking.booking_reference,
+      room_number: roomNumber !== 'Assigned at check-in' ? `${roomNumber}` : 'Assigned upon arrival',
+      room_type: roomType,
+      check_in_date: formatDate(booking.check_in_date),
+      check_out_date: formatDate(booking.check_out_date),
+      check_in_time: hotelConfig?.checkInTime || '15:00',
+      check_out_time: hotelConfig?.checkOutTime || '11:00',
+      total_amount: Number(booking.total_amount)?.toFixed(2) || '0.00',
+      wifi_network: hotelConfig?.wifiNetwork || 'Patten_Guest_WiFi',
+      wifi_password: hotelConfig?.wifiPassword || 'PattenArmsWelcome',
+      hotel_phone: hotelConfig?.phone || '+44 1925 650144',
+      hotel_address: hotelConfig?.address || 'Parker Street, Warrington, WA1 1HG',
+      google_review_link: hotelConfig?.googleReviewLink || 'https://g.page/r/pattenarmshotel/review',
+    }
+
+    if (tplObj && tplObj.template) {
+      setCustomText(formatWhatsAppTemplate(tplObj.template, vars))
+    } else if (messageType === 'confirmation') {
       const text = generateBookingConfirmationWhatsAppText({
         guestName: guestFullName,
         bookingRef: booking.booking_reference,
@@ -108,30 +137,42 @@ export default function WhatsAppMessageModal({ booking, defaultType = 'confirmat
 
         <div className="p-6 space-y-4">
           {/* Mode Switcher */}
-          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
             <button
               type="button"
               onClick={() => setMessageType('confirmation')}
-              className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 messageType === 'confirmation'
                   ? 'bg-white text-emerald-800 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-              1. Booking Confirmation
+              1. Confirmation
+            </button>
+            <button
+              type="button"
+              onClick={() => setMessageType('wifi')}
+              className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                messageType === 'wifi'
+                  ? 'bg-white text-emerald-800 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Wifi className="w-3.5 h-3.5 text-blue-600" />
+              2. WiFi Welcome
             </button>
             <button
               type="button"
               onClick={() => setMessageType('review')}
-              className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 messageType === 'review'
                   ? 'bg-white text-emerald-800 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-              2. Post-Stay Review Request
+              3. Review Request
             </button>
           </div>
 

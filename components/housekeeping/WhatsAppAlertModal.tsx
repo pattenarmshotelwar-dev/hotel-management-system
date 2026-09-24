@@ -5,6 +5,7 @@ import { Room } from '@/lib/types'
 import { sendCleanerWhatsAppMessage } from '@/lib/utils'
 import { X, MessageSquare, Send, Check } from 'lucide-react'
 import { toast } from 'sonner'
+import { getSavedWhatsAppSettings, formatWhatsAppTemplate, createWhatsAppDispatchUrl } from '@/lib/whatsapp'
 
 interface Props {
   room: Room
@@ -13,8 +14,9 @@ interface Props {
 }
 
 export default function WhatsAppAlertModal({ room, hasArrivalToday = false, onClose }: Props) {
-  const savedPhone = typeof window !== 'undefined' ? localStorage.getItem('patten_cleaner_phone') || '' : ''
-  const [phone, setPhone] = useState(savedPhone)
+  const waSettings = getSavedWhatsAppSettings()
+  const initialPhone = waSettings.cleanerPhone || (typeof window !== 'undefined' ? localStorage.getItem('patten_cleaner_phone') || '' : '')
+  const [phone, setPhone] = useState(initialPhone)
   const [priority, setPriority] = useState<'Normal' | 'Urgent (Arrival Today)' | 'Guest Request'>(
     hasArrivalToday ? 'Urgent (Arrival Today)' : 'Normal'
   )
@@ -24,14 +26,28 @@ export default function WhatsAppAlertModal({ room, hasArrivalToday = false, onCl
     if (phone) {
       localStorage.setItem('patten_cleaner_phone', phone)
     }
-    sendCleanerWhatsAppMessage({
-      phone,
-      roomNumber: room.room_number,
-      roomType: room.room_type.replace('_', ' '),
-      floor: room.floor,
-      priority,
-      notes,
-    })
+    const tplObj = waSettings.templates.find(t => t.id === 'tpl_cleaner_turnover')
+    if (tplObj && tplObj.template) {
+      const vars = {
+        room_number: room.room_number,
+        room_type: room.room_type.replace('_', ' '),
+        floor: String(room.floor),
+        urgency_level: priority,
+        cleaning_portal_link: typeof window !== 'undefined' ? `${window.location.origin}/housekeeping` : 'https://hotel-management-system-one-lovat.vercel.app/housekeeping',
+      }
+      const text = formatWhatsAppTemplate(tplObj.template, vars)
+      const url = createWhatsAppDispatchUrl(phone, text, waSettings.defaultCountryCode)
+      window.open(url, '_blank')
+    } else {
+      sendCleanerWhatsAppMessage({
+        phone,
+        roomNumber: room.room_number,
+        roomType: room.room_type.replace('_', ' '),
+        floor: room.floor,
+        priority,
+        notes,
+      })
+    }
     toast.success(`WhatsApp opened for Room ${room.room_number}!`)
     onClose()
   }
