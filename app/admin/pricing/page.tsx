@@ -96,7 +96,7 @@ export default function PricingPage() {
   useEffect(() => {
     fetchRooms()
     loadSavedPricingConfig()
-    const savedKey = localStorage.getItem('patten_ticketmaster_api_key') || ''
+    const savedKey = localStorage.getItem('patten_ticketmaster_api_key') || process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY || ''
     if (savedKey) setTicketmasterApiKey(savedKey)
     const savedCustom = localStorage.getItem('patten_custom_events')
     if (savedCustom) {
@@ -110,7 +110,7 @@ export default function PricingPage() {
   const fetchLiveEvents = async (category = 'all', keyOverride?: string) => {
     setEventsLoading(true)
     try {
-      const keyToUse = keyOverride !== undefined ? keyOverride : (ticketmasterApiKey || localStorage.getItem('patten_ticketmaster_api_key') || '')
+      const keyToUse = keyOverride !== undefined ? keyOverride : (ticketmasterApiKey || localStorage.getItem('patten_ticketmaster_api_key') || process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY || '')
       const url = new URL('/api/admin/events', window.location.origin)
       if (category !== 'all') url.searchParams.set('category', category)
       if (keyToUse) url.searchParams.set('apiKey', keyToUse)
