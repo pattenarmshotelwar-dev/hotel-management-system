@@ -173,7 +173,6 @@ export async function GET(request: NextRequest) {
 
         const res = await fetch(tmUrl.toString(), {
           headers: { Accept: 'application/json' },
-          next: { revalidate: 3600 }, // Cache 1 hour
         })
 
         if (res.ok) {
