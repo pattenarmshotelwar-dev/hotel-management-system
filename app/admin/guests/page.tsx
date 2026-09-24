@@ -374,11 +374,6 @@ export default function GuestCRMPage() {
 
       {/* KPI Ribbon */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Guests In CRM</p>
-          <p className="text-xl font-extrabold text-slate-900 mt-0.5">{guests.length}</p>
-      {/* KPI Ribbon */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Guests In CRM</p>
           <p className="text-xl font-extrabold text-slate-900 mt-0.5">{guests.length}</p>
