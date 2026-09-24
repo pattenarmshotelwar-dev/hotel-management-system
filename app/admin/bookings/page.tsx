@@ -134,9 +134,10 @@ function BookingsContent() {
     const payments = (b as any).payments || []
     const paid = payments
       .filter((p: any) => p.status === 'succeeded')
-      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
-    const balance = Math.max(0, b.total_amount - paid)
-    return { paid, balance, isFullyPaid: balance <= 0 && b.total_amount > 0 }
+      .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
+    const total = Number(b.total_amount) || 0
+    const balance = Math.max(0, total - paid)
+    return { paid, balance, isFullyPaid: balance <= 0 && total > 0 }
   }
 
   // KPIs
@@ -299,8 +300,8 @@ function BookingsContent() {
         const nameB = `${b.guest_first_name} ${b.guest_last_name}`.toLowerCase()
         return nameA.localeCompare(nameB)
       }
-      if (sortBy === 'total_desc') return (b.total_amount || 0) - (a.total_amount || 0)
-      if (sortBy === 'total_asc') return (a.total_amount || 0) - (b.total_amount || 0)
+      if (sortBy === 'total_desc') return (Number(b.total_amount) || 0) - (Number(a.total_amount) || 0)
+      if (sortBy === 'total_asc') return (Number(a.total_amount) || 0) - (Number(b.total_amount) || 0)
       if (sortBy === 'balance_desc') {
         const balA = getBookingPaymentInfo(a).balance
         const balB = getBookingPaymentInfo(b).balance

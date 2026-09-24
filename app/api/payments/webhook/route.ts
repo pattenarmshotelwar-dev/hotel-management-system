@@ -5,11 +5,16 @@ import { createAdminClient } from '@/lib/supabase/server'
 export async function POST(request: NextRequest) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder')
   const body = await request.text()
-  const signature = request.headers.get('stripe-signature')!
+  const signature = request.headers.get('stripe-signature')
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+
+  if (!signature || !webhookSecret) {
+    return NextResponse.json({ error: 'Missing stripe-signature header or webhook secret' }, { status: 400 })
+  }
 
   let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET!)
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
   } catch (err: any) {
     return NextResponse.json({ error: `Webhook error: ${err.message}` }, { status: 400 })
   }

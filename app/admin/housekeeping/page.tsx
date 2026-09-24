@@ -293,7 +293,7 @@ export default function HousekeepingAdminPage() {
       if (ticketSearch.trim()) {
         const q = ticketSearch.toLowerCase().trim()
         const match =
-          t.title.toLowerCase().includes(q) ||
+          (t.title || '').toLowerCase().includes(q) ||
           (t.description || '').toLowerCase().includes(q) ||
           ((t.room as any)?.room_number || '').toString().includes(q) ||
           (t.reported_by || '').toLowerCase().includes(q)

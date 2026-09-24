@@ -165,7 +165,7 @@ export default function PaymentsPage() {
       if (maxAmount && !isNaN(parseFloat(maxAmount)) && p.amount > parseFloat(maxAmount)) return false
 
       // Date Presets
-      const pDate = p.created_at.split('T')[0]
+      const pDate = (p.created_at || '').split('T')[0]
       if (datePreset === 'today') {
         if (pDate !== todayStr) return false
       } else if (datePreset === 'yesterday') {
@@ -187,8 +187,8 @@ export default function PaymentsPage() {
     return [...result].sort((a, b) => {
       if (sortBy === 'date_desc') return (b.created_at || '').localeCompare(a.created_at || '')
       if (sortBy === 'date_asc') return (a.created_at || '').localeCompare(b.created_at || '')
-      if (sortBy === 'amount_desc') return b.amount - a.amount
-      if (sortBy === 'amount_asc') return a.amount - b.amount
+      if (sortBy === 'amount_desc') return (Number(b.amount) || 0) - (Number(a.amount) || 0)
+      if (sortBy === 'amount_asc') return (Number(a.amount) || 0) - (Number(b.amount) || 0)
       if (sortBy === 'guest_asc') {
         const gA = `${(a.booking as any)?.guest_first_name ?? ''} ${(a.booking as any)?.guest_last_name ?? ''}`.toLowerCase()
         const gB = `${(b.booking as any)?.guest_first_name ?? ''} ${(b.booking as any)?.guest_last_name ?? ''}`.toLowerCase()
@@ -201,11 +201,11 @@ export default function PaymentsPage() {
   // Financial Summary
   const stats = useMemo(() => {
     const succeeded = filtered.filter(p => p.status === 'succeeded')
-    const totalRev = succeeded.reduce((s, p) => s + p.amount, 0)
-    const stripeRev = succeeded.filter(p => ['stripe_card', 'stripe_link'].includes(p.method)).reduce((s, p) => s + p.amount, 0)
-    const bComRev = succeeded.filter(p => ['booking_com_vcc', 'booking_com_payout'].includes(p.method)).reduce((s, p) => s + p.amount, 0)
-    const offlineRev = succeeded.filter(p => ['cash', 'bank_transfer'].includes(p.method)).reduce((s, p) => s + p.amount, 0)
-    const todayRev = succeeded.filter(p => p.created_at.startsWith(todayStr)).reduce((s, p) => s + p.amount, 0)
+    const totalRev = succeeded.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+    const stripeRev = succeeded.filter(p => ['stripe_card', 'stripe_link'].includes(p.method)).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+    const bComRev = succeeded.filter(p => ['booking_com_vcc', 'booking_com_payout'].includes(p.method)).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+    const offlineRev = succeeded.filter(p => ['cash', 'bank_transfer'].includes(p.method)).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+    const todayRev = succeeded.filter(p => (p.created_at || '').startsWith(todayStr)).reduce((s, p) => s + (Number(p.amount) || 0), 0)
     const avgTxn = succeeded.length > 0 ? totalRev / succeeded.length : 0
 
     return { totalRev, stripeRev, bComRev, offlineRev, todayRev, avgTxn, count: succeeded.length }

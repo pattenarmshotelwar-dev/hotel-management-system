@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category') || 'all'
-    const customApiKey = searchParams.get('apiKey') || process.env.TICKETMASTER_API_KEY
+    const customApiKey = searchParams.get('apiKey') || process.env.TICKETMASTER_API_KEY || process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY
 
     let ticketmasterEvents: EventItem[] = []
     let tmConnected = false

@@ -37,10 +37,15 @@ export async function POST(request: Request) {
     // Safety constraint: This endpoint can only provision staff service accounts
     const targetEmail = email.toLowerCase().trim()
     const allowedStaffEmails = [
+      'manager@pattenarms.co.uk',
+      'accounts@pattenarms.co.uk',
+      'info@pattenarms.co.uk',
+      'bookings@pattenarms.co.uk',
+      'housekeeping@pattenarms.co.uk',
       'foh@pattenarms.com',
       'frontdesk@patternarmswarhotel.co.uk',
       'cleaning@pattenarms.com',
-      'housekeeping@pattenarms.com'
+      'housekeeping@pattenarms.com',
     ]
     if (!allowedStaffEmails.includes(targetEmail)) {
       return NextResponse.json({ error: 'This endpoint can only provision staff service accounts' }, { status: 400 })

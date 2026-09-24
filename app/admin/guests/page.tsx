@@ -180,7 +180,7 @@ export default function GuestCRMPage() {
   const filteredGuests = useMemo(() => {
     const result = guests.filter(g => {
       const q = search.toLowerCase().trim()
-      const fullName = `${g.first_name} ${g.last_name}`.toLowerCase()
+      const fullName = `${g.first_name || ''} ${g.last_name || ''}`.trim().toLowerCase()
       const matchesQuery =
         !q ||
         fullName.includes(q) ||
@@ -224,8 +224,8 @@ export default function GuestCRMPage() {
       if (sortBy === 'stays_desc') return statB.totalStays - statA.totalStays
       if (sortBy === 'recent_desc') return (statB.lastStayDate || '').localeCompare(statA.lastStayDate || '')
       if (sortBy === 'name_asc') {
-        const nameA = `${a.first_name} ${a.last_name}`.toLowerCase()
-        const nameB = `${b.first_name} ${b.last_name}`.toLowerCase()
+        const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase()
+        const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase()
         return nameA.localeCompare(nameB)
       }
       if (sortBy === 'created_desc') return (b.created_at || '').localeCompare(a.created_at || '')
