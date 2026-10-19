@@ -312,3 +312,116 @@ The repository is continuously deployed to **Vercel** via GitHub integration:
   * `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
   * `STRIPE_WEBHOOK_SECRET`
   * `NEXT_PUBLIC_TICKETMASTER_API_KEY`
+
+---
+
+## 7. Booking.com Two-Way Connectivity Strategies & Architectures
+
+Maintaining an uninterrupted two-way synchronization with **Booking.com** is critical to guarantee rate parity, maximize occupancy, and prevent double bookings. The PMS supports four distinct operational architectures for two-way synchronization:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        BOOKING.COM 2-WAY CONNECTIVITY ARCHITECTURES                    │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+
+ [Method 1: Two-Way iCal Feeds]               [Method 2: Channel Manager Bridge]
+ ┌─────────────┐       ┌─────────────┐       ┌─────────────┐  REST API   ┌─────────────┐
+ │  PMS Engine │◄─────►│ Booking.com │       │  PMS Engine │◄───────────►│ Channex /   │
+ │   (/api)    │  .ics │  Extranet   │       │  (/webhook) │  Webhooks   │   Beds24    │
+ └─────────────┘       └─────────────┘       └─────────────┘             └──────┬──────┘
+  Cost: £0/mo • Interval: 15-30m                                                │ B.com Certified
+                                                                                ▼
+ [Method 3: Direct Connectivity API]                                     ┌─────────────┐
+ ┌─────────────┐    B.com XML/REST   ┌─────────────┐                     │ Booking.com │
+ │  PMS Engine │◄───────────────────►│ Booking.com │                     │  Extranet   │
+ └─────────────┘   (PCI-DSS Certified)└─────────────┘                    └─────────────┘
+  Cost: Free • Direct Certified                                           Cost: ~£15-25/mo • Sub-sec
+
+ [Method 4: Hostinger n8n Event Pipeline]
+ ┌─────────────┐     Webhook      ┌─────────────┐    Email / Push    ┌─────────────┐
+ │  PMS Engine │◄─────────────────┤ Hostinger   │◄───────────────────┤ Booking.com │
+ │  (/webhook) │   (Instant POST) │ n8n VPS     │  (Reservations)    │  Extranet   │
+ └─────────────┘                  └─────────────┘                    └─────────────┘
+  Cost: £0/mo • Real-time (5-10s)
+```
+
+---
+
+### Architecture 1: Native Two-Way iCal Calendar Sync (Direct & Free)
+* **Status:** **Active & Native in PMS (`/admin/settings`)**
+* **Cost:** **£0 / month** (Completely free, no third-party accounts required).
+* **Latency:** ~15 to 30 minutes (polling cycle).
+* **How it works:**
+  1. **Outbound (PMS -> Booking.com):**
+     * The PMS generates a unique, live iCal feed per room:  
+       `https://hotel-management-system-one-lovat.vercel.app/api/ical/export/[roomId]`
+     * In the **Booking.com Extranet** (`Rates & Availability > Sync Calendars > Add Calendar Connection`), the hotelier pastes this export link.
+     * Booking.com reads all direct reservations, walk-ins, and maintenance blocks and closes those dates automatically on Booking.com.
+  2. **Inbound (Booking.com -> PMS):**
+     * Booking.com provides an export `.ics` link for each room.
+     * The hotelier pastes this into PMS Settings (`Booking.com Import URL`).
+     * The PMS runs a background cron calling `/api/ical/sync`, which uses `node-ical` to parse newly added reservations, generate reference numbers, assign rooms, and update room cleanliness.
+* **Best For:** Small-to-medium independent hotels with moderate turnover wanting a zero-cost, maintenance-free connection.
+
+---
+
+### Architecture 2: API-First Channel Manager Bridge (Channex.io / Beds24)
+* **Status:** **Supported via Universal Webhook (`/api/channels/booking-com/webhook`)**
+* **Cost:** **~£15–£25 / month** (or ~£1 per room/month).
+* **Latency:** **Real-time (< 3 seconds)**.
+* **How it works:**
+  * Connecting directly to Booking.com’s raw API requires months of partner auditing and mandatory PCI-DSS Level 1 certification. An API-first Channel Manager (like **Channex.io**, **Beds24**, or **Smoobu**) already holds official **Premier Connectivity Partner** status.
+  * **Two-Way Flow:**
+    1. **Outbound Rates & Inventory (PMS -> Channel Manager -> Booking.com):**
+       * The PMS exposes live rates at `/api/pricing/booking-com` (including the +15% OTA commission protection markup).
+       * Whenever rates or minimum-night rules change in the PMS, an outbound API call pushes the new availability and pricing to Channex/Beds24, which updates Booking.com, Expedia, and Airbnb simultaneously in under 3 seconds.
+    2. **Inbound Reservations & Modifications (Booking.com -> Channel Manager -> PMS):**
+       * When a guest books, modifies dates, or cancels on Booking.com, Channex/Beds24 fires an instant JSON webhook to our PMS endpoint:  
+         `https://hotel-management-system-one-lovat.vercel.app/api/channels/booking-com/webhook`
+       * The PMS instantly updates room availability, creates the guest record, and records Virtual Credit Card (VCC) details.
+* **Best For:** High-occupancy properties requiring instantaneous synchronization across multiple OTAs (Booking.com + Expedia + Airbnb) to eliminate any split-second double-booking risk.
+
+---
+
+### Architecture 3: Official Direct Booking.com Connectivity Partner API
+* **Cost:** Free API access from Booking.com, but substantial technical compliance costs.
+* **Latency:** **Instant (< 1 second)**.
+* **How it works:**
+  * Direct technical integration through the **Booking.com Connectivity Partner Program** (`connectivity.booking.com`).
+  * Implements Booking.com's B.com OTA 2014A XML / REST protocols:
+    * `OTA_HotelAvailNotifRQ`: Real-time room inventory updates and stop-sells.
+    * `OTA_HotelRateAmountNotifRQ`: Dynamic nightly pricing, weekend surge rates, single-occupancy discounts.
+    * `OTA_ResRetrieveRS`: Webhook push stream receiving reservation XML payloads directly from Booking.com servers.
+* **Requirements:**
+  * Annual independent **PCI-DSS Level 1 Compliance Audit** to store and decrypt guest credit card numbers.
+  * Strict SLA requirements (99.9% uptime and error rate below 0.1%).
+* **Best For:** Large hotel chains or software vendors licensing PMS software to dozens of hotels.
+
+---
+
+### Architecture 4: Hostinger n8n Automation Event Pipeline (Hybrid Direct)
+* **Status:** **Supported via Universal Webhook (`/api/channels/booking-com/webhook`)**
+* **Cost:** **£0 / month** (Runs directly on UVDigital's existing Hostinger VPS `srv2039559.hstgr.cloud`).
+* **Latency:** **Near real-time (5 to 10 seconds)**.
+* **How it works:**
+  1. Booking.com Extranet dispatches an instant reservation alert email or webhook notification to `bookings@pattenarms.co.uk`.
+  2. A dedicated workflow on your **Hostinger n8n server** parses the reservation reference, guest name, phone number, stay dates, and revenue.
+  3. n8n performs an authenticated POST to `/api/channels/booking-com/webhook`, immediately inserting the confirmed reservation into Supabase.
+  4. n8n triggers an automated WhatsApp message to the housekeeping team with the checkout date for scheduling turnover.
+* **Best For:** Hotels wanting near-instantaneous automated reservation capture and WhatsApp staff alerts with zero monthly third-party software costs.
+
+---
+
+### Summary Comparison of Connection Methods
+
+| Feature | 1. Two-Way iCal Feeds | 2. Channel Manager Bridge (Channex/Beds24) | 3. Direct B.com API | 4. Hostinger n8n Pipeline |
+| :--- | :--- | :--- | :--- | :--- |
+| **Monthly Cost** | **£0 / mo** | ~£15–£25 / mo | Free API (PCI-DSS cost) | **£0 / mo** |
+| **Sync Speed** | 15–30 minutes | **&lt; 3 seconds** | **&lt; 1 second** | 5–10 seconds |
+| **Syncs Availability** | Yes | Yes | Yes | Yes |
+| **Pushes Dynamic Rates** | Manual in Extranet | **Automatic real-time** | **Automatic real-time** | Automatic via script |
+| **Captures VCC Cards** | View in Extranet | **Yes (Tokenized)** | Yes (Requires PCI) | View in Extranet |
+| **Multi-OTA (Expedia/Airbnb)** | Per-room iCal URLs | **Single unified pipe** | Separate API certs | Email/webhook parsers |
+| **Setup Complexity** | Very Simple (5 mins) | Simple (Plug & Play) | Complex (Months of audit) | Moderate (n8n workflow) |
+| **Current PMS Readiness** | **Live & Active** | **Webhook Ready** | API Routes Documented | **Webhook Ready** |
+

@@ -29,6 +29,10 @@ import {
   Database,
   Lock,
   MessageSquare,
+  Globe,
+  Webhook,
+  Zap,
+  Radio,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import NewRoomModal from '@/components/settings/NewRoomModal'
@@ -42,6 +46,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState<string | null>(null)
   const [syncingAll, setSyncingAll] = useState(false)
   const [activeTab, setActiveTab] = useState<'rooms' | 'ical' | 'hotel' | 'whatsapp' | 'addons' | 'security'>('rooms')
+  const [channelSyncMode, setChannelSyncMode] = useState<'ical' | 'channel_manager' | 'n8n_webhook'>('ical')
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [floorFilter, setFloorFilter] = useState('all')
@@ -499,14 +504,207 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* TAB 2: ICAL CHANNELS */}
+          {/* TAB 2: ICAL CHANNELS & BOOKING.COM TWO-WAY SYNC */}
           {activeTab === 'ical' && (
-            <div className="space-y-5">
+            <div className="space-y-6">
+              {/* Architecture Selector Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setChannelSyncMode('ical')}
+                  className={cn(
+                    'p-4 rounded-2xl border text-left transition relative flex flex-col justify-between cursor-pointer',
+                    channelSyncMode === 'ical'
+                      ? 'bg-blue-50/80 border-blue-500 ring-2 ring-blue-500/20'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        Active & Free
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-xs text-slate-900">1. Two-Way iCal Feeds</h4>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                      Room-by-room calendar feed exchange. Native Booking.com Extranet calendar sync with zero monthly fees.
+                    </p>
+                  </div>
+                  <div className="mt-3 text-[10px] font-semibold text-slate-400">
+                    Cycle: ~15 mins • Cost: £0/mo
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setChannelSyncMode('channel_manager')}
+                  className={cn(
+                    'p-4 rounded-2xl border text-left transition relative flex flex-col justify-between cursor-pointer',
+                    channelSyncMode === 'channel_manager'
+                      ? 'bg-purple-50/80 border-purple-500 ring-2 ring-purple-500/20'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-xs">
+                        <Globe className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                        Real-time API
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-xs text-slate-900">2. Channel Manager Bridge</h4>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                      Connect Channex.io, Beds24, or Smoobu for live rates, stop-sells, instant reservations & VCC card capture.
+                    </p>
+                  </div>
+                  <div className="mt-3 text-[10px] font-semibold text-slate-400">
+                    Latency: &lt; 3 sec • Multi-OTA
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setChannelSyncMode('n8n_webhook')}
+                  className={cn(
+                    'p-4 rounded-2xl border text-left transition relative flex flex-col justify-between cursor-pointer',
+                    channelSyncMode === 'n8n_webhook'
+                      ? 'bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600 font-bold text-xs">
+                        <Zap className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                        Hostinger n8n
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-xs text-slate-900">3. Automated n8n Pipeline</h4>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                      Hostinger VPS n8n pipeline parses instant OTA emails/webhooks, writes to DB, and sends WhatsApp alerts.
+                    </p>
+                  </div>
+                  <div className="mt-3 text-[10px] font-semibold text-slate-400">
+                    Latency: &lt; 10 sec • Self-hosted
+                  </div>
+                </button>
+              </div>
+
+              {/* MODE 2 VIEW: CHANNEL MANAGER API GATEWAY */}
+              {channelSyncMode === 'channel_manager' && (
+                <div className="bg-white border border-purple-200 rounded-2xl p-6 shadow-sm space-y-4">
+                  <div className="border-b border-slate-100 pb-3 flex items-start justify-between">
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-purple-600" /> Certified Channel Manager API Bridge (Channex / Beds24)
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Provides sub-second two-way synchronization with Booking.com, Expedia, and Airbnb without requiring custom PCI-DSS audits.
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold px-2.5 py-1 bg-purple-100 text-purple-800 rounded-lg">
+                      Webhook Active
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                        Incoming Webhook Endpoint (Paste into Channel Manager)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={`${typeof window !== 'undefined' ? window.location.origin : 'https://hotel-management-system-one-lovat.vercel.app'}/api/channels/booking-com/webhook`}
+                          className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-700 select-all"
+                        />
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/api/channels/booking-com/webhook`)
+                            toast.success('Webhook URL copied to clipboard!')
+                          }}
+                          className="p-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs transition"
+                          title="Copy URL"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Receives real-time reservations, modifications, and cancellations automatically.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                        Live Room Rates & Multipliers Feed
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={`${typeof window !== 'undefined' ? window.location.origin : 'https://hotel-management-system-one-lovat.vercel.app'}/api/pricing/booking-com`}
+                          className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-700 select-all"
+                        />
+                        <a
+                          href="/api/pricing/booking-com"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs transition"
+                          title="View Rate JSON"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Exposes daily rates including the configured +15% OTA commission protection markup.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* MODE 3 VIEW: HOSTINGER n8n AUTOMATION PIPELINE */}
+              {channelSyncMode === 'n8n_webhook' && (
+                <div className="bg-white border border-amber-200 rounded-2xl p-6 shadow-sm space-y-4">
+                  <div className="border-b border-slate-100 pb-3 flex items-start justify-between">
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-amber-600" /> Hostinger VPS n8n Automation Pipeline
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Leverages your dedicated UVDigital n8n instance on Hostinger VPS (<code className="font-mono text-amber-700">srv2039559.hstgr.cloud</code>) for zero-cost instant OTA booking ingestion.
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg">
+                      Zero Extra Cost
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-amber-50/60 border border-amber-200 rounded-xl space-y-2 text-xs text-amber-900 leading-relaxed">
+                    <p className="font-bold">How the Hostinger n8n Pipeline works:</p>
+                    <ol className="list-decimal list-inside space-y-1">
+                      <li>Booking.com dispatches an instant confirmation email or push notification to <code className="font-mono bg-white px-1 py-0.5 rounded">bookings@pattenarms.co.uk</code>.</li>
+                      <li>n8n on your Hostinger VPS parses the reservation reference, room allocation, check-in dates, and guest contact numbers.</li>
+                      <li>n8n performs an immediate POST to <code className="font-mono bg-white px-1 py-0.5 rounded">/api/channels/booking-com/webhook</code>, creating the booking in Supabase.</li>
+                      <li>n8n triggers a WhatsApp turnover notification to the hotel cleaning staff.</li>
+                    </ol>
+                  </div>
+                </div>
+              )}
+
               {/* Instructions banner */}
               <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200 flex items-start gap-3">
                 <Calendar className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-blue-900 leading-relaxed">
-                  <p className="font-bold text-sm mb-0.5">Booking.com 2-Way Calendar Integration</p>
+                  <p className="font-bold text-sm mb-0.5">Booking.com 2-Way Calendar Integration (iCal Engine)</p>
                   <p>
                     <strong>1. Import:</strong> Paste your Booking.com room iCal feed into the <em>Import Feed</em> box.
                     <br />
